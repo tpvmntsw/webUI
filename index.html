@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MT9676 Signage WebUI — devkit (v6)</title>
+  <style>
+    /* default black base (HOME). external source -> html.transparent (set by shell) */
+    html { background: #000; }
+    html.transparent, html.transparent body { background: transparent !important; }
+    html, body { margin: 0; height: 100vh; width: 100vw; overflow: hidden; font-family: Arial, sans-serif; }
+    #stage { position: absolute; inset: 0; }
+    .screen { position: absolute; inset: 0; }
+    /* base HOME layer (layer 'source.home', bottom of LAYER_ORDER) */
+    #home { display: flex; align-items: center; justify-content: center; color: #555; font-size: 28px; }
+    html.transparent #home { display: none; }
+  </style>
+</head>
+<body>
+  <div id="stage">
+    <div id="home" class="screen">MT9676 Signage</div>
+  </div>
+
+  <!-- core shell (board-bound production code) -->
+  <script src="shell.js"></script>
+
+  <!-- transport: mock in devkit (default / ?mock=1), real WS with ?ws=1 -->
+  <script src="transport-ws.js"></script>
+  <script src="mock-transport.js"></script>
+
+  <!-- screens: add new ones here, one <script> per file -->
+  <script src="screens/source-menu.js"></script>
+  <script src="screens/app-usb.js"></script>
+  <!-- <script src="screens/your-screen.js"></script> -->
+
+  <!-- dev-panel: dev-only, NOT loaded on the board -->
+  <script src="dev-panel.js"></script>
+
+  <script>
+    (function () {
+      var qs = new URLSearchParams(location.search);
+      // devkit defaults to mock; pass ?ws=1 to hit a real backend.
+      var useWs = qs.get('ws') === '1';
+      var transport = useWs ? new WsTransport() : new MockTransport();
+      if (!useWs) window.mock = transport; // dev-panel uses window.mock
+      Shell.attachTransport(transport);
+      Shell.boot({ stageId: 'stage' });
+    })();
+  </script>
+</body>
+</html>

@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MT9676 Signage WebUI v6 — 開發者導覽</title>
+<style>
+  :root { --bg:#0d0f14; --fg:#e6ebf2; --dim:#8a94a6; --accent:#3a86ff; --accent2:#ffc239; --card:#161a22; --line:#2a3140; }
+  * { box-sizing: border-box; }
+  html, body { margin:0; height:100%; background:var(--bg); color:var(--fg);
+    font-family:"Segoe UI","PingFang TC","Microsoft JhengHei",Arial,sans-serif; }
+  #deck { height:100vh; display:flex; align-items:center; justify-content:center; }
+  .slide { display:none; width:min(960px,92vw); padding:48px 56px; }
+  .slide.active { display:block; animation:fade .25s ease; }
+  @keyframes fade { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:none} }
+  h1 { font-size:2.6rem; margin:0 0 8px; line-height:1.15; }
+  h2 { font-size:1.9rem; margin:0 0 24px; color:var(--fg); }
+  h2 .tag { color:var(--accent); }
+  .sub { color:var(--dim); font-size:1.15rem; margin-bottom:8px; }
+  ul { line-height:1.9; font-size:1.2rem; padding-left:1.2em; }
+  li b { color:var(--accent2); }
+  code, pre { font-family:"Cascadia Code",Consolas,monospace; }
+  code { background:#11151c; color:#cde3ff; padding:2px 7px; border-radius:5px; font-size:.95em; }
+  pre { background:#11151c; border:1px solid var(--line); border-radius:10px; padding:18px 20px;
+    font-size:1.02rem; line-height:1.55; overflow:auto; }
+  pre .k { color:#ff7b9c; } pre .s { color:#9ece6a; } pre .c { color:#5b6577; } pre .f { color:#7aa2f7; }
+  .cols { display:flex; gap:28px; }
+  .cols > div { flex:1; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:18px 22px; }
+  .stack { font-family:monospace; font-size:1.05rem; line-height:1.7; }
+  .stack .row { display:flex; justify-content:space-between; padding:3px 10px; border-radius:6px; }
+  .stack .row.hi { background:rgba(58,134,255,.18); }
+  .stack .row.lo { background:rgba(255,255,255,.03); }
+  .stack .name { color:var(--accent2); } .stack .desc { color:var(--dim); }
+  .good { color:#9ece6a; } .bad { color:#ff7b9c; }
+  table { border-collapse:collapse; font-size:1.05rem; width:100%; }
+  td, th { border:1px solid var(--line); padding:8px 12px; text-align:left; }
+  th { background:#11151c; color:var(--accent); }
+  .big { font-size:1.5rem; line-height:1.7; }
+  footer { position:fixed; bottom:18px; left:0; right:0; display:flex; justify-content:space-between;
+    padding:0 28px; color:var(--dim); font-size:.9rem; align-items:center; }
+  .dots { display:flex; gap:7px; }
+  .dot { width:8px; height:8px; border-radius:50%; background:#2a3140; }
+  .dot.on { background:var(--accent); }
+  .hint { color:var(--dim); font-size:.85rem; }
+  .pill { display:inline-block; background:var(--accent); color:#fff; padding:2px 10px; border-radius:20px;
+    font-size:.85rem; vertical-align:middle; margin-left:8px; }
+</style>
+</head>
+<body>
+<div id="deck">
+
+  <!-- 1 -->
+  <section class="slide active">
+    <div class="sub">MT9676 Signage</div>
+    <h1>WebUI 開發者導覽 <span class="pill">v6</span></h1>
+    <p class="big" style="color:var(--dim)">一個薄殼 + 很多畫面<br>怎麼做一個畫面、怎麼排 z-order、怎麼交付</p>
+    <p class="hint">← → 或空白鍵翻頁 · 給協作同事</p>
+  </section>
+
+  <!-- 2 -->
+  <section class="slide">
+    <h2>架構：<span class="tag">shell + screens</span></h2>
+    <div class="cols">
+      <div class="card">
+        <h3 style="color:var(--accent)">shell.js（我們維護）</h3>
+        <ul style="font-size:1.05rem">
+          <li>誰蓋誰（z-order）</li>
+          <li>按鍵路由 NAV</li>
+          <li>WebSocket 跟後端</li>
+          <li>開關畫面 / 逾時自動關</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3 style="color:var(--accent2)">screens/*.js（你寫）</h3>
+        <ul style="font-size:1.05rem">
+          <li>一支檔 = 一個畫面</li>
+          <li>音量條、OSD、Information…</li>
+          <li>只填一個 <code>Shell.register</code></li>
+          <li>只碰自己的 DOM</li>
+        </ul>
+      </div>
+    </div>
+    <p class="big" style="margin-top:24px">新功能 ＝ 加一支 <code>.js</code> + <code>index.html</code> 一行。</p>
+  </section>
+
+  <!-- 3 -->
+  <section class="slide">
+    <h2>兩種「疊」<span class="tag">別搞混</span></h2>
+    <table>
+      <tr><th>疊的層次</th><th>誰負責</th><th>怎麼控制</th></tr>
+      <tr><td><b>畫面 vs 畫面</b><br>音量條蓋在 OSD 上？</td><td>shell</td><td>你宣告的 <code>layer</code> 名</td></tr>
+      <tr><td><b>畫面內部物件</b><br>按鈕疊在縮圖上？</td><td>你自己</td><td>普通 CSS <code>z-index</code></td></tr>
+    </table>
+    <p class="big" style="margin-top:28px">畫面<b style="color:var(--accent2)">內部</b>愛怎麼疊就怎麼疊，跳不出你的容器。<br>shell 只管畫面<b style="color:var(--accent2)">之間</b>誰在上面 → 你只挑一個 layer 名。</p>
+  </section>
+
+  <!-- 4 -->
+  <section class="slide">
+    <h2>你要做的事 <span class="tag">3 步</span></h2>
+    <pre><span class="c"># 1. 複製範本</span>
+cp screens/_template.js screens/audio-volume.js
+
+<span class="c"># 2. 填一個 Shell.register({ ... })  （下一頁）</span>
+
+<span class="c"># 3. index.html 加一行</span>
+&lt;script src=<span class="s">"screens/audio-volume.js"</span>&gt;&lt;/script&gt;</pre>
+    <p class="big">重整瀏覽器 → 完成。<span style="color:var(--dim)">沒有 build、沒有 npm、沒有框架。</span></p>
+  </section>
+
+  <!-- 5 -->
+  <section class="slide">
+    <h2>一個畫面長這樣</h2>
+    <pre>Shell.register({
+  <span class="f">id</span>: <span class="s">'audio-volume'</span>,        <span class="c">// == 檔名去 .js</span>
+  <span class="f">layer</span>: <span class="s">'volume'</span>,             <span class="c">// 層級「名字」，不是數字</span>
+  <span class="f">timeout</span>: <span class="s">15000</span>,             <span class="c">// 15s 沒動作自動關</span>
+
+  <span class="f">mount</span>: <span class="k">function</span>(el){ <span class="c">/* 建 DOM 一次，只碰自己的 el */</span> },
+  <span class="f">onShow</span>: <span class="k">function</span>(){ <span class="c">/* 從 Shell.store 取現值 */</span> },
+  <span class="f">onNav</span>: <span class="k">function</span>(act){ <span class="k">return</span> act===<span class="s">'VOL+'</span>; }, <span class="c">// true=吃掉</span>
+  <span class="f">onVal</span>: <span class="k">function</span>(k,v){ <span class="c">/* 後端推來新 DB 值 */</span> }
+});</pre>
+  </section>
+
+  <!-- 6 -->
+  <section class="slide">
+    <h2>v6 重點：<span class="tag">層級用「名字」</span></h2>
+    <div class="cols">
+      <div>
+        <p class="sub">Shell.LAYER_ORDER（唯一真源，後面＝高）</p>
+        <div class="stack card">
+          <div class="row hi"><span class="name">volume</span><span class="desc">音量/靜音</span></div>
+          <div class="row"><span class="name">info-banner</span><span class="desc">切源 toast</span></div>
+          <div class="row"><span class="name">osd-menu</span><span class="desc">OSD / Source</span></div>
+          <div class="row"><span class="name">information</span><span class="desc">Display 三段</span></div>
+          <div class="row"><span class="name">setup-wizard</span><span class="desc">開機精靈</span></div>
+          <div class="row"><span class="name">factory</span><span class="desc">工廠選單</span></div>
+          <div class="row"><span class="name">no-signal</span><span class="desc">無訊號</span></div>
+          <div class="row"><span class="name">blackout</span><span class="desc">遮黑</span></div>
+          <div class="row lo"><span class="name">source.usb / hdmi / home</span><span class="desc">來源底層</span></div>
+        </div>
+      </div>
+      <div>
+        <p class="big">挑一個名字填 <code>layer</code>。</p>
+        <p class="big">查自己在哪：<br><code>Shell.getLayerRank('osd-menu')</code></p>
+        <p style="color:var(--dim);font-size:1.05rem">大者在上。多個畫面可共用同一層（互斥只顯示最上）。</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 7 -->
+  <section class="slide">
+    <h2>為什麼名字 &gt; 數字</h2>
+    <div class="cols">
+      <div class="card">
+        <p class="sub bad">舊版（絕對數字）</p>
+        <pre style="font-size:.95rem">priority: <span class="bad">970</span>
+priority: <span class="bad">950</span>
+priority: <span class="bad">940</span>
+<span class="c">// 要插一層 / 調順序</span>
+<span class="c">// → 一堆檔的數字全要改</span></pre>
+      </div>
+      <div class="card">
+        <p class="sub good">v6（具名有序表）</p>
+        <pre style="font-size:.95rem">layer: <span class="s">'osd-menu'</span>
+layer: <span class="s">'volume'</span>
+<span class="c">// 要調順序</span>
+<span class="c">// → 搬動 LAYER_ORDER 一個名字</span>
+<span class="good">// 畫面檔零改動 ✓</span></pre>
+      </div>
+    </div>
+    <p class="big" style="margin-top:22px"><code>smoke-test.js (e)</code> 鎖住這個保證：搬一個名字 → 兩畫面上下對調，screen 程式碼不動。</p>
+  </section>
+
+  <!-- 8 -->
+  <section class="slide">
+    <h2>按鍵 NAV / 資料 VAL</h2>
+    <div class="cols">
+      <div>
+        <p class="sub">NAV：先給最上層 <code>onNav(act)</code></p>
+        <ul style="font-size:1.05rem">
+          <li>回 <b>true</b> = 我吃掉了</li>
+          <li>回 <b>false</b> = shell 全域路由 ↓</li>
+        </ul>
+        <table style="font-size:.95rem">
+          <tr><td>MENU</td><td>→ osd-menu</td></tr>
+          <tr><td>SOURCE</td><td>→ source-menu</td></tr>
+          <tr><td>BACK</td><td>→ 關最上層</td></tr>
+          <tr><td>VOL± / MUTE</td><td>→ audio-volume</td></tr>
+          <tr><td>DISPLAY</td><td>→ info-display</td></tr>
+        </table>
+      </div>
+      <div>
+        <p class="sub">VAL：DB 值變動</p>
+        <ul style="font-size:1.05rem">
+          <li>shell 先更新 <code>Shell.store[key]</code></li>
+          <li>再呼叫每個畫面 <code>onVal(key,value)</code></li>
+          <li>你只挑關心的 key 反應</li>
+        </ul>
+        <p class="card" style="font-size:1.02rem">你<b style="color:var(--accent2)">不</b>自己判斷硬體狀態（no_signal／音量／Information 欄位都由後端推）。你只畫畫面。</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 9 -->
+  <section class="slide">
+    <h2>特殊：<span class="tag">source-bound 底層</span></h2>
+    <p class="sub">綁某來源、全屏、不由按鍵叫出（如 USB 播放器）</p>
+    <pre>Shell.register({
+  <span class="f">id</span>: <span class="s">'app-usb'</span>,
+  <span class="f">layer</span>: <span class="s">'source.usb'</span>,
+  <span class="f">source</span>: <span class="s">'USB'</span>,        <span class="c">// ← 關鍵：綁 USB 來源</span>
+  <span class="f">mount</span>: <span class="k">function</span>(el){ <span class="c">/* 畫播放器殼 */</span> },
+  <span class="f">onNav</span>: <span class="k">function</span>(act){ <span class="k">return</span> <span class="k">false</span>; } <span class="c">// 讓系統鍵照常路由</span>
+});</pre>
+    <p class="big">切到 USB → shell 自動把它當不透明底層顯示（在所有 overlay 之下），切走自動隱藏。你不用 show/hide。</p>
+  </section>
+
+  <!-- 10 -->
+  <section class="slide">
+    <h2>Do / Don't</h2>
+    <div class="cols">
+      <div class="card">
+        <p class="sub good">✅ Do</p>
+        <ul style="font-size:1.05rem">
+          <li>只碰自己的 <code>el</code></li>
+          <li>共享狀態讀 <code>Shell.store</code></li>
+          <li><code>mount</code> 建一次，刷新放 <code>onShow</code></li>
+          <li>改完跑 <code>node smoke-test.js</code></li>
+        </ul>
+      </div>
+      <div class="card">
+        <p class="sub bad">❌ Don't</p>
+        <ul style="font-size:1.05rem">
+          <li>伸手改別人畫面的 DOM</li>
+          <li>自己寫絕對 z-index 跟別人比</li>
+          <li>自己開 WebSocket / 判斷 no_signal</li>
+          <li>改 <code>shell.js</code> / <code>transport-ws.js</code></li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- 11 -->
+  <section class="slide">
+    <h2>上手 <span class="tag">指令</span></h2>
+    <pre><span class="c"># 跑起來（mock，右下角有 DEV PANEL）</span>
+python -m http.server 8137
+<span class="c"># → http://localhost:8137/</span>
+
+<span class="c"># 驗證狀態機（26 項，全 PASS 才安全）</span>
+node smoke-test.js</pre>
+    <table style="margin-top:18px">
+      <tr><th>先讀</th><th>內容</th></tr>
+      <tr><td><code>APP開發指南.md</code></td><td>從零到合板，逐步</td></tr>
+      <tr><td><code>QUICKSTART.md</code></td><td>一頁速查</td></tr>
+      <tr><td><code>screens/_template.js</code></td><td>複製即開工</td></tr>
+      <tr><td><code>screens/app-usb.js</code></td><td>source-bound 範例</td></tr>
+    </table>
+  </section>
+
+  <!-- 12 -->
+  <section class="slide">
+    <h1>開工！</h1>
+    <p class="big">複製範本 → 填 <code>Shell.register</code>（一個 <code>layer</code> 名）→ <code>index.html</code> 加一行。</p>
+    <p class="big" style="color:var(--dim)">有問題找 Coordinator / Builder。<br>規格真源：<code>2026-06-22_webui-ui-spec_v6.md</code></p>
+  </section>
+
+</div>
+
+<footer>
+  <span class="hint">MT9676 Signage WebUI v6</span>
+  <div class="dots" id="dots"></div>
+  <span class="hint"><span id="num">1</span> / <span id="total">12</span></span>
+</footer>
+
+<script>
+  var slides = document.querySelectorAll('.slide');
+  var dotsBox = document.getElementById('dots');
+  var i = 0;
+  document.getElementById('total').textContent = slides.length;
+  for (var d = 0; d < slides.length; d++) {
+    var el = document.createElement('div'); el.className = 'dot'; dotsBox.appendChild(el);
+  }
+  var dots = dotsBox.children;
+  function render() {
+    for (var n = 0; n < slides.length; n++) {
+      slides[n].classList.toggle('active', n === i);
+      dots[n].classList.toggle('on', n === i);
+    }
+    document.getElementById('num').textContent = i + 1;
+  }
+  function go(d) { i = Math.max(0, Math.min(slides.length - 1, i + d)); render(); }
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'ArrowRight' || e.key === ' ' || e.key === 'PageDown') { go(1); e.preventDefault(); }
+    else if (e.key === 'ArrowLeft' || e.key === 'PageUp') { go(-1); e.preventDefault(); }
+    else if (e.key === 'Home') { i = 0; render(); }
+    else if (e.key === 'End') { i = slides.length - 1; render(); }
+  });
+  document.addEventListener('click', function (e) { go(e.clientX < window.innerWidth/2 ? -1 : 1); });
+  render();
+</script>
+</body>
+</html>
