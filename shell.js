@@ -344,6 +344,16 @@
     if (!act) return;
     this._emit('nav', act);
 
+    // 0) global nav observers (e.g. factory-menu password sequence detection)
+    //    These receive every nav event regardless of stack state.
+    for (var id in this.screens) {
+      if (!this.screens.hasOwnProperty(id)) continue;
+      var observer = this.screens[id];
+      if (typeof observer.onNavGlobal === 'function') {
+        try { observer.onNavGlobal(act); } catch (e) { this._emit('warn', 'onNavGlobal ' + id + ' ' + e); }
+      }
+    }
+
     // 1) top active screen gets first crack
     var t = this.top();
     if (t) {
