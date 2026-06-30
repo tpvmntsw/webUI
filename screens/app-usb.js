@@ -1,0 +1,855 @@
+/*
+ * app-usb.js — USB Multi-Media Player shell (PRODUCTION code, board-bound).
+ *
+ * SOURCE-BOUND base layer: declares `source: 'USB'`, so the shell shows this as
+ * the OPAQUE base layer whenever the current source is USB, beneath every overlay.
+ *
+ * USB device detection:
+ *   - Production: backend monitors system USB events, pushes VAL usb_device_list
+ *   - Dev/Mock: simulated USB devices with mock folder structure
+ *
+ * User flow:
+ *   1. No USB -> shows "No USB device"
+ *   2. USB inserted -> shows device selection
+ *   3. Press OK on device -> shows split-panel view:
+ *      - Left panel: Folder/Music/Video/Photo categories
+ *      - Right panel: Contents of selected category
+ *   4. UP/DOWN on left panel switches categories
+ *   5. RIGHT enters right panel
+ *   6. LEFT on first item returns to left panel
+ *   7. BACK returns to previous level or device list
+ */
+(function () {
+  'use strict';
+
+  var stageEl = null;
+  var idleEl = null;
+  var deviceListEl = null;
+  var splitViewEl = null;
+  var leftPanelEl = null;
+  var rightPanelEl = null;
+  var idleTextEl = null;
+  var idleIconEl = null;
+
+  var usbDevices = [];
+  var selectedDeviceIndex = 0;
+  // 'idle' | 'devices' | 'split'
+  var currentView = 'idle';
+  var currentDeviceId = null;
+  // 'left' | 'right' - which panel is active
+  var activePanel = 'left';
+  var selectedCategoryIndex = 0;
+  var folderEntries = [];
+  var selectedFolderIndex = 0;
+  var currentPath = [];
+  var navigationStack = [];
+
+  // Categories for USB content
+  var CATEGORIES = [
+    { id: 'folders', name: 'Folder', icon: '&#128193;' },
+    { id: 'music', name: 'Music', icon: '&#127925;' },
+    { id: 'video', name: 'Video', icon: '&#127910;' },
+    { id: 'photo', name: 'Photo', icon: '&#128444;' }
+  ];
+
+  // Mock data for each category (20+ items per root)
+  var MOCK_DATA = {
+    folders: {
+      root: [
+        { name: 'Documents', isDirectory: true },
+        { name: 'Downloads', isDirectory: true },
+        { name: 'Pictures', isDirectory: true },
+        { name: 'Music', isDirectory: true },
+        { name: 'Videos', isDirectory: true },
+        { name: 'Projects', isDirectory: true },
+        { name: 'Backup', isDirectory: true },
+        { name: 'Archive', isDirectory: true },
+        { name: 'readme.txt', isDirectory: false },
+        { name: 'notes.txt', isDirectory: false },
+        { name: 'config.json', isDirectory: false },
+        { name: 'data.csv', isDirectory: false },
+        { name: 'report.pdf', isDirectory: false },
+        { name: 'presentation.pptx', isDirectory: false },
+        { name: 'spreadsheet.xlsx', isDirectory: false },
+        { name: 'document.docx', isDirectory: false },
+        { name: 'script.sh', isDirectory: false },
+        { name: 'log.txt', isDirectory: false },
+        { name: 'backup.zip', isDirectory: false },
+        { name: 'install.exe', isDirectory: false },
+        { name: 'license.txt', isDirectory: false },
+        { name: 'changelog.md', isDirectory: false }
+      ],
+      Documents: [
+        { name: 'Work', isDirectory: true },
+        { name: 'Personal', isDirectory: true },
+        { name: 'resume.pdf', isDirectory: false },
+        { name: 'contract.pdf', isDirectory: false }
+      ],
+      Downloads: [
+        { name: 'setup.exe', isDirectory: false },
+        { name: 'archive.zip', isDirectory: false },
+        { name: 'image.png', isDirectory: false }
+      ],
+      Pictures: [
+        { name: 'screenshot_01.png', isDirectory: false },
+        { name: 'screenshot_02.png', isDirectory: false }
+      ],
+      Projects: [
+        { name: 'project_a', isDirectory: true },
+        { name: 'project_b', isDirectory: true },
+        { name: 'todo.txt', isDirectory: false }
+      ],
+      Backup: [
+        { name: 'backup_2024.zip', isDirectory: false },
+        { name: 'backup_2025.zip', isDirectory: false },
+        { name: 'backup_2026.zip', isDirectory: false }
+      ],
+      Archive: [
+        { name: 'old_files', isDirectory: true },
+        { name: 'archive_2023.tar', isDirectory: false }
+      ],
+      Work: [
+        { name: 'meeting_notes.txt', isDirectory: false },
+        { name: 'project_plan.pdf', isDirectory: false }
+      ],
+      Personal: [
+        { name: 'diary.txt', isDirectory: false },
+        { name: 'recipes.pdf', isDirectory: false }
+      ],
+      project_a: [
+        { name: 'src', isDirectory: true },
+        { name: 'README.md', isDirectory: false }
+      ],
+      project_b: [
+        { name: 'main.py', isDirectory: false },
+        { name: 'requirements.txt', isDirectory: false }
+      ]
+    },
+    video: {
+      root: [
+        { name: 'Movies', isDirectory: true },
+        { name: 'TV Shows', isDirectory: true },
+        { name: 'Tutorials', isDirectory: true },
+        { name: 'Recordings', isDirectory: true },
+        { name: 'movie_classic.mp4', isDirectory: false },
+        { name: 'movie_action.mkv', isDirectory: false },
+        { name: 'movie_comedy.avi', isDirectory: false },
+        { name: 'movie_drama.mp4', isDirectory: false },
+        { name: 'documentary_01.mp4', isDirectory: false },
+        { name: 'documentary_02.mkv', isDirectory: false },
+        { name: 'concert_live.mp4', isDirectory: false },
+        { name: 'interview.mov', isDirectory: false },
+        { name: 'clip_funny.mp4', isDirectory: false },
+        { name: 'clip_sports.mp4', isDirectory: false },
+        { name: 'trailer_01.mp4', isDirectory: false },
+        { name: 'trailer_02.mp4', isDirectory: false },
+        { name: 'wedding_video.mp4', isDirectory: false },
+        { name: 'birthday_party.mov', isDirectory: false },
+        { name: 'vacation_2024.mp4', isDirectory: false },
+        { name: 'vacation_2025.mp4', isDirectory: false },
+        { name: 'tutorial_cooking.mp4', isDirectory: false },
+        { name: 'tutorial_coding.mkv', isDirectory: false }
+      ],
+      Movies: [
+        { name: 'Action', isDirectory: true },
+        { name: 'Comedy', isDirectory: true },
+        { name: 'blockbuster_2024.mp4', isDirectory: false },
+        { name: 'indie_film.mkv', isDirectory: false }
+      ],
+      'TV Shows': [
+        { name: 'series_s01e01.mp4', isDirectory: false },
+        { name: 'series_s01e02.mp4', isDirectory: false },
+        { name: 'series_s01e03.mp4', isDirectory: false }
+      ],
+      Tutorials: [
+        { name: 'photoshop_basics.mp4', isDirectory: false },
+        { name: 'excel_tips.mp4', isDirectory: false },
+        { name: 'programming_101.mkv', isDirectory: false }
+      ],
+      Recordings: [
+        { name: 'meeting_2024_01.mp4', isDirectory: false },
+        { name: 'meeting_2024_02.mp4', isDirectory: false },
+        { name: 'presentation_rec.mov', isDirectory: false }
+      ],
+      Action: [
+        { name: 'hero_rises.mp4', isDirectory: false },
+        { name: 'fast_chase.mkv', isDirectory: false }
+      ],
+      Comedy: [
+        { name: 'laugh_out_loud.mp4', isDirectory: false },
+        { name: 'funny_moments.avi', isDirectory: false }
+      ]
+    },
+    music: {
+      root: [
+        { name: 'Albums', isDirectory: true },
+        { name: 'Playlists', isDirectory: true },
+        { name: 'Podcasts', isDirectory: true },
+        { name: 'Audiobooks', isDirectory: true },
+        { name: 'song_pop_01.mp3', isDirectory: false },
+        { name: 'song_pop_02.mp3', isDirectory: false },
+        { name: 'song_rock_01.mp3', isDirectory: false },
+        { name: 'song_rock_02.flac', isDirectory: false },
+        { name: 'song_jazz_01.mp3', isDirectory: false },
+        { name: 'song_jazz_02.flac', isDirectory: false },
+        { name: 'song_classical_01.flac', isDirectory: false },
+        { name: 'song_classical_02.wav', isDirectory: false },
+        { name: 'song_electronic_01.mp3', isDirectory: false },
+        { name: 'song_electronic_02.mp3', isDirectory: false },
+        { name: 'song_hiphop_01.mp3', isDirectory: false },
+        { name: 'song_hiphop_02.mp3', isDirectory: false },
+        { name: 'song_country_01.mp3', isDirectory: false },
+        { name: 'song_rnb_01.mp3', isDirectory: false },
+        { name: 'ambient_01.mp3', isDirectory: false },
+        { name: 'ambient_02.flac', isDirectory: false },
+        { name: 'live_recording.wav', isDirectory: false },
+        { name: 'remix_special.mp3', isDirectory: false }
+      ],
+      Albums: [
+        { name: 'Rock Classics', isDirectory: true },
+        { name: 'Jazz Collection', isDirectory: true },
+        { name: 'Pop Hits 2024', isDirectory: true },
+        { name: 'Electronic Mix', isDirectory: true }
+      ],
+      Playlists: [
+        { name: 'favorites.m3u', isDirectory: false },
+        { name: 'workout.m3u', isDirectory: false },
+        { name: 'relaxing.m3u', isDirectory: false },
+        { name: 'party.m3u', isDirectory: false }
+      ],
+      Podcasts: [
+        { name: 'tech_talk_ep01.mp3', isDirectory: false },
+        { name: 'tech_talk_ep02.mp3', isDirectory: false },
+        { name: 'news_daily.mp3', isDirectory: false }
+      ],
+      Audiobooks: [
+        { name: 'novel_chapter01.mp3', isDirectory: false },
+        { name: 'novel_chapter02.mp3', isDirectory: false },
+        { name: 'self_help_intro.mp3', isDirectory: false }
+      ],
+      'Rock Classics': [
+        { name: 'track01_legendary.mp3', isDirectory: false },
+        { name: 'track02_anthem.mp3', isDirectory: false },
+        { name: 'track03_ballad.mp3', isDirectory: false }
+      ],
+      'Jazz Collection': [
+        { name: 'smooth_jazz_01.flac', isDirectory: false },
+        { name: 'bebop_classic.flac', isDirectory: false }
+      ],
+      'Pop Hits 2024': [
+        { name: 'summer_hit.mp3', isDirectory: false },
+        { name: 'dance_anthem.mp3', isDirectory: false },
+        { name: 'ballad_2024.mp3', isDirectory: false }
+      ],
+      'Electronic Mix': [
+        { name: 'techno_01.mp3', isDirectory: false },
+        { name: 'house_02.mp3', isDirectory: false },
+        { name: 'trance_03.flac', isDirectory: false }
+      ]
+    },
+    photo: {
+      root: [
+        { name: 'Vacation', isDirectory: true },
+        { name: 'Family', isDirectory: true },
+        { name: 'Wallpapers', isDirectory: true },
+        { name: 'Screenshots', isDirectory: true },
+        { name: 'Events', isDirectory: true },
+        { name: 'photo_001.jpg', isDirectory: false },
+        { name: 'photo_002.jpg', isDirectory: false },
+        { name: 'photo_003.png', isDirectory: false },
+        { name: 'photo_004.jpg', isDirectory: false },
+        { name: 'photo_005.jpg', isDirectory: false },
+        { name: 'sunset_beach.jpg', isDirectory: false },
+        { name: 'mountain_view.png', isDirectory: false },
+        { name: 'cityscape.jpg', isDirectory: false },
+        { name: 'portrait_01.jpg', isDirectory: false },
+        { name: 'portrait_02.jpg', isDirectory: false },
+        { name: 'nature_01.jpg', isDirectory: false },
+        { name: 'nature_02.png', isDirectory: false },
+        { name: 'food_photo.jpg', isDirectory: false },
+        { name: 'pet_photo.jpg', isDirectory: false },
+        { name: 'selfie_2024.jpg', isDirectory: false },
+        { name: 'panorama.jpg', isDirectory: false },
+        { name: 'art_gallery.png', isDirectory: false }
+      ],
+      Vacation: [
+        { name: 'Beach 2024', isDirectory: true },
+        { name: 'Mountain Trip', isDirectory: true },
+        { name: 'beach_01.jpg', isDirectory: false },
+        { name: 'beach_02.jpg', isDirectory: false },
+        { name: 'hotel_view.jpg', isDirectory: false },
+        { name: 'sunset.png', isDirectory: false }
+      ],
+      Family: [
+        { name: 'birthday_2024.jpg', isDirectory: false },
+        { name: 'birthday_2025.jpg', isDirectory: false },
+        { name: 'christmas_2024.jpg', isDirectory: false },
+        { name: 'gathering_01.png', isDirectory: false },
+        { name: 'gathering_02.jpg', isDirectory: false }
+      ],
+      Wallpapers: [
+        { name: 'nature_wallpaper_01.jpg', isDirectory: false },
+        { name: 'nature_wallpaper_02.jpg', isDirectory: false },
+        { name: 'abstract_01.png', isDirectory: false },
+        { name: 'abstract_02.png', isDirectory: false },
+        { name: 'minimalist.jpg', isDirectory: false }
+      ],
+      Screenshots: [
+        { name: 'screenshot_2024_01.png', isDirectory: false },
+        { name: 'screenshot_2024_02.png', isDirectory: false },
+        { name: 'screenshot_2025_01.png', isDirectory: false },
+        { name: 'error_capture.png', isDirectory: false }
+      ],
+      Events: [
+        { name: 'concert_2024.jpg', isDirectory: false },
+        { name: 'wedding_photo.jpg', isDirectory: false },
+        { name: 'graduation.jpg', isDirectory: false },
+        { name: 'party_night.jpg', isDirectory: false }
+      ],
+      'Beach 2024': [
+        { name: 'sunrise.jpg', isDirectory: false },
+        { name: 'swimming.jpg', isDirectory: false },
+        { name: 'sandcastle.jpg', isDirectory: false }
+      ],
+      'Mountain Trip': [
+        { name: 'peak_view.jpg', isDirectory: false },
+        { name: 'hiking_trail.jpg', isDirectory: false },
+        { name: 'campfire.jpg', isDirectory: false }
+      ]
+    }
+  };
+
+  function render() {
+    if (!idleEl || !deviceListEl || !splitViewEl) return;
+
+    idleEl.style.display = 'none';
+    deviceListEl.style.display = 'none';
+    splitViewEl.style.display = 'none';
+
+    if (currentView === 'idle' || (currentView === 'devices' && usbDevices.length === 0)) {
+      idleEl.style.display = 'flex';
+      if (idleTextEl) idleTextEl.textContent = 'No USB device';
+      if (idleIconEl) {
+        idleIconEl.innerHTML = '&#128190;';
+        idleIconEl.style.color = '#5b6577';
+      }
+      currentView = 'idle';
+    } else if (currentView === 'devices') {
+      deviceListEl.style.display = 'block';
+      renderDeviceList();
+    } else if (currentView === 'split') {
+      splitViewEl.style.display = 'flex';
+      renderLeftPanel();
+      renderRightPanel();
+    }
+  }
+
+  function renderDeviceList() {
+    if (!deviceListEl) return;
+    var html = '<div class="usb-section-title">USB Devices</div>';
+    for (var i = 0; i < usbDevices.length; i++) {
+      var device = usbDevices[i];
+      var cls = 'usb-list-item' + (i === selectedDeviceIndex ? ' usb-selected' : '');
+      var displayName = device.label || device.name || ('USB Device ' + (i + 1));
+      html += '<div class="' + cls + '" data-index="' + i + '">' +
+        '<span class="usb-list-icon">&#128190;</span>' +
+        '<span class="usb-list-name">' + escapeHtml(displayName) + '</span>' +
+        '</div>';
+    }
+    deviceListEl.innerHTML = html;
+  }
+
+  function renderLeftPanel() {
+    if (!leftPanelEl) return;
+    var html = '';
+    for (var i = 0; i < CATEGORIES.length; i++) {
+      var cat = CATEGORIES[i];
+      var isSelected = (i === selectedCategoryIndex);
+      var isActive = (activePanel === 'left' && isSelected);
+      var cls = 'usb-cat-item' + (isSelected ? ' usb-cat-selected' : '') + (isActive ? ' usb-cat-active' : '');
+      html += '<div class="' + cls + '" data-index="' + i + '">' +
+        '<div class="usb-cat-icon">' + cat.icon + '</div>' +
+        '<div class="usb-cat-name">' + escapeHtml(cat.name) + '</div>' +
+        '</div>';
+    }
+    leftPanelEl.innerHTML = html;
+  }
+
+  var GRID_COLS = 4;
+  var GRID_ROWS = 3;
+  var ITEMS_PER_PAGE = GRID_COLS * GRID_ROWS;
+  // Scroll offset for smooth scrolling (row-based)
+  var scrollRowOffset = 0;
+
+  function renderRightPanel() {
+    if (!rightPanelEl) return;
+    var cat = CATEGORIES[selectedCategoryIndex];
+    var pathDisplay = currentPath.length > 0 ? currentPath.join(' / ') : cat.name;
+    var html = '<div class="usb-right-header">' + escapeHtml(pathDisplay) + '</div>';
+    html += '<div class="usb-right-content-wrapper">';
+
+    if (folderEntries.length === 0) {
+      html += '<div class="usb-right-content"><div class="usb-empty">Empty</div></div>';
+    } else {
+      // Calculate visible window based on scroll offset
+      var startIdx = scrollRowOffset * GRID_COLS;
+      var endIdx = Math.min(startIdx + ITEMS_PER_PAGE, folderEntries.length);
+
+      html += '<div class="usb-right-content">';
+      html += '<div class="usb-file-grid">';
+      for (var i = startIdx; i < endIdx; i++) {
+        var entry = folderEntries[i];
+        var icon = entry.isDirectory ? '&#128193;' : getFileIcon(entry.name);
+        var isSelected = (activePanel === 'right' && i === selectedFolderIndex);
+        var cls = 'usb-file-item' + (isSelected ? ' usb-file-selected' : '');
+        html += '<div class="' + cls + '" data-index="' + i + '">' +
+          '<span class="usb-file-icon">' + icon + '</span>' +
+          '<span class="usb-file-name">' + escapeHtml(entry.name) + '</span>' +
+          '</div>';
+      }
+      html += '</div>';
+      html += '</div>';
+
+      // Scrollbar
+      var totalRows = Math.ceil(folderEntries.length / GRID_COLS);
+      if (totalRows > GRID_ROWS) {
+        var scrollbarHeight = Math.max(30, (GRID_ROWS / totalRows) * 100);
+        var maxScrollOffset = totalRows - GRID_ROWS;
+        var scrollbarTop = maxScrollOffset > 0 ? (scrollRowOffset / maxScrollOffset) * (100 - scrollbarHeight) : 0;
+        html += '<div class="usb-scrollbar-track">' +
+          '<div class="usb-scrollbar-thumb" style="height:' + scrollbarHeight + '%;top:' + scrollbarTop + '%"></div>' +
+          '</div>';
+      }
+    }
+    html += '</div>';
+    rightPanelEl.innerHTML = html;
+  }
+
+  function updateScrollOffset() {
+    // Calculate which row the cursor is on
+    var cursorRow = Math.floor(selectedFolderIndex / GRID_COLS);
+    var totalRows = Math.ceil(folderEntries.length / GRID_COLS);
+
+    // Keep cursor in the middle row (row index 1 of 0,1,2) when possible
+    // When moving down: if cursor goes to row 2 (third row), scroll up so cursor is on row 1
+    // When moving up: if cursor goes to row 0 (first row), scroll down so cursor is on row 1
+
+    var visibleRowStart = scrollRowOffset;
+    var visibleRowEnd = scrollRowOffset + GRID_ROWS - 1;
+
+    // If cursor is below visible area
+    if (cursorRow > visibleRowEnd) {
+      scrollRowOffset = cursorRow - (GRID_ROWS - 1);
+    }
+    // If cursor is above visible area
+    else if (cursorRow < visibleRowStart) {
+      scrollRowOffset = cursorRow;
+    }
+    // Try to keep cursor in middle row when there's room to scroll
+    else if (cursorRow === visibleRowEnd && cursorRow < totalRows - 1) {
+      // Cursor at bottom row and there's more content below - scroll to put cursor in middle
+      scrollRowOffset = Math.min(cursorRow - 1, totalRows - GRID_ROWS);
+    }
+    else if (cursorRow === visibleRowStart && scrollRowOffset > 0) {
+      // Cursor at top row and there's more content above - scroll to put cursor in middle
+      scrollRowOffset = Math.max(cursorRow - 1, 0);
+    }
+
+    // Clamp scroll offset
+    var maxOffset = Math.max(0, totalRows - GRID_ROWS);
+    scrollRowOffset = Math.max(0, Math.min(scrollRowOffset, maxOffset));
+  }
+
+  function getFileIcon(filename) {
+    var ext = (filename.split('.').pop() || '').toLowerCase();
+    var videoExts = ['mp4', 'mkv', 'avi', 'mov', 'wmv', 'flv', 'webm'];
+    var audioExts = ['mp3', 'wav', 'flac', 'aac', 'ogg', 'wma', 'm3u'];
+    var imageExts = ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp', 'svg'];
+
+    if (videoExts.indexOf(ext) !== -1) return '&#127910;';
+    if (audioExts.indexOf(ext) !== -1) return '&#127925;';
+    if (imageExts.indexOf(ext) !== -1) return '&#128444;';
+    return '&#128196;';
+  }
+
+  function escapeHtml(str) {
+    var div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+  }
+
+  function updateDeviceList(devices) {
+    usbDevices = devices || [];
+    selectedDeviceIndex = 0;
+
+    if (usbDevices.length === 0) {
+      currentView = 'idle';
+      currentDeviceId = null;
+      folderEntries = [];
+      currentPath = [];
+      navigationStack = [];
+      activePanel = 'left';
+    } else if (currentView === 'idle') {
+      currentView = 'devices';
+    }
+    render();
+  }
+
+  function loadCategoryContent(categoryId) {
+    var categoryData = MOCK_DATA[categoryId] || {};
+    folderEntries = categoryData['root'] || [];
+    selectedFolderIndex = 0;
+    scrollRowOffset = 0;
+    currentPath = [];
+    navigationStack = [];
+  }
+
+  function moveSelectionVertical(dir) {
+    if (currentView === 'devices') {
+      if (usbDevices.length === 0) return;
+      selectedDeviceIndex = (selectedDeviceIndex + dir + usbDevices.length) % usbDevices.length;
+      renderDeviceList();
+    } else if (currentView === 'split') {
+      if (activePanel === 'left') {
+        var newIndex = selectedCategoryIndex + dir;
+        if (newIndex >= 0 && newIndex < CATEGORIES.length) {
+          selectedCategoryIndex = newIndex;
+          loadCategoryContent(CATEGORIES[selectedCategoryIndex].id);
+          renderLeftPanel();
+          renderRightPanel();
+        }
+      } else {
+        if (folderEntries.length === 0) return;
+        // Move by row (GRID_COLS items per row)
+        var newIndex = selectedFolderIndex + (dir * GRID_COLS);
+        if (newIndex >= 0 && newIndex < folderEntries.length) {
+          selectedFolderIndex = newIndex;
+          updateScrollOffset();
+          renderRightPanel();
+        }
+      }
+    }
+  }
+
+  function moveSelectionHorizontalInGrid(dir) {
+    if (folderEntries.length === 0) return false;
+    var newIndex = selectedFolderIndex + dir;
+    // Check if we're at the edge of the grid
+    var currentCol = selectedFolderIndex % GRID_COLS;
+    var newCol = currentCol + dir;
+
+    if (dir === -1 && currentCol === 0) {
+      // At leftmost column, go back to left panel
+      return false;
+    }
+    if (dir === 1 && (newCol >= GRID_COLS || newIndex >= folderEntries.length)) {
+      // At rightmost column or end of items, do nothing (only OK enters folder)
+      return true;
+    }
+    if (newIndex >= 0 && newIndex < folderEntries.length) {
+      selectedFolderIndex = newIndex;
+      renderRightPanel();
+      return true;
+    }
+    return true;
+  }
+
+  function moveRight() {
+    if (currentView === 'split' && activePanel === 'left') {
+      if (folderEntries.length > 0) {
+        activePanel = 'right';
+        selectedFolderIndex = 0;
+        scrollRowOffset = 0;
+        renderLeftPanel();
+        renderRightPanel();
+      }
+      return true;
+    } else if (currentView === 'split' && activePanel === 'right') {
+      return moveSelectionHorizontalInGrid(1);
+    }
+    return false;
+  }
+
+  function moveLeft() {
+    if (currentView === 'split' && activePanel === 'right') {
+      var currentCol = selectedFolderIndex % GRID_COLS;
+      if (currentCol > 0) {
+        // Move left within grid
+        selectedFolderIndex--;
+        renderRightPanel();
+        return true;
+      }
+      // At leftmost column
+      if (navigationStack.length > 0) {
+        // Go back in folder navigation
+        var prev = navigationStack.pop();
+        currentPath.pop();
+        loadMockFolder(prev.folder);
+        selectedFolderIndex = prev.selectedIndex;
+        scrollRowOffset = prev.scrollOffset || 0;
+        updateScrollOffset();
+        renderRightPanel();
+        return true;
+      }
+      // Go back to left panel
+      activePanel = 'left';
+      renderLeftPanel();
+      renderRightPanel();
+      return true;
+    }
+    return false;
+  }
+
+  function enterFolder(folderName) {
+    var categoryId = CATEGORIES[selectedCategoryIndex].id;
+    var currentFolderKey = currentPath.length === 0 ? 'root' : currentPath[currentPath.length - 1];
+    navigationStack.push({
+      folder: currentFolderKey,
+      selectedIndex: selectedFolderIndex,
+      scrollOffset: scrollRowOffset
+    });
+    currentPath.push(folderName);
+    loadMockFolder(folderName);
+    renderRightPanel();
+  }
+
+  function loadMockFolder(folderName) {
+    var categoryId = CATEGORIES[selectedCategoryIndex].id;
+    var categoryData = MOCK_DATA[categoryId] || {};
+    folderEntries = categoryData[folderName] || [];
+    selectedFolderIndex = 0;
+    scrollRowOffset = 0;
+  }
+
+  function enterSelected() {
+    if (currentView === 'devices') {
+      if (usbDevices.length === 0) return;
+      var device = usbDevices[selectedDeviceIndex];
+      currentDeviceId = device.id;
+      selectedCategoryIndex = 0;
+      activePanel = 'left';
+      loadCategoryContent(CATEGORIES[0].id);
+      currentView = 'split';
+      render();
+    } else if (currentView === 'split') {
+      if (activePanel === 'left') {
+        moveRight();
+      } else if (activePanel === 'right' && folderEntries.length > 0) {
+        var entry = folderEntries[selectedFolderIndex];
+        if (entry.isDirectory) {
+          enterFolder(entry.name);
+        }
+      }
+    }
+  }
+
+  function goBack() {
+    if (currentView === 'split') {
+      if (activePanel === 'right') {
+        if (navigationStack.length > 0) {
+          var prev = navigationStack.pop();
+          currentPath.pop();
+          loadMockFolder(prev.folder);
+          selectedFolderIndex = prev.selectedIndex;
+          scrollRowOffset = prev.scrollOffset || 0;
+          updateScrollOffset();
+          renderRightPanel();
+          return true;
+        }
+        activePanel = 'left';
+        renderLeftPanel();
+        renderRightPanel();
+        return true;
+      }
+      // Back to device list from left panel
+      currentView = 'devices';
+      selectedCategoryIndex = 0;
+      folderEntries = [];
+      currentPath = [];
+      navigationStack = [];
+      scrollRowOffset = 0;
+      render();
+      return true;
+    } else if (currentView === 'devices') {
+      return false;
+    }
+    return false;
+  }
+
+  // Listen for NAV events directly since source-bound base layer
+  // doesn't receive onNav when stack is empty
+  var isVisible = false;
+
+  Shell.on('nav', function(act) {
+    if (!isVisible) return;
+    // Only handle if no overlay is on top (stack is empty)
+    if (Shell.stack.length > 0) return;
+    handleNavAction(act);
+  });
+
+  function handleNavAction(act) {
+    if (currentView === 'idle') {
+      return false;
+    }
+
+    switch (act) {
+      case 'UP':
+        moveSelectionVertical(-1);
+        return true;
+      case 'DOWN':
+        moveSelectionVertical(1);
+        return true;
+      case 'LEFT':
+        return moveLeft();
+      case 'RIGHT':
+        return moveRight();
+      case 'OK':
+        enterSelected();
+        return true;
+      case 'BACK':
+        return goBack();
+    }
+    return false;
+  }
+
+  Shell.register({
+    id: 'app-usb',
+    layer: 'source.usb',
+    source: 'USB',
+
+    mount: function (el) {
+      // CSS follows slides.html design spec (v6)
+      // Colors: --bg:#0d0f14, --fg:#e6ebf2, --dim:#8a94a6, --accent:#3a86ff, --accent2:#ffc239, --card:#161a22, --line:#2a3140
+      el.innerHTML =
+        '<style>' +
+        '.usb-root{position:absolute;inset:0;background:#0d0f14;display:flex;' +
+          'align-items:center;justify-content:center;' +
+          'font-family:"Segoe UI","PingFang TC","Microsoft JhengHei",Arial,sans-serif}' +
+        '.usb-player{width:92%;max-width:1400px;height:85%;background:#161a22;' +
+          'border:1px solid #2a3140;border-radius:16px;box-shadow:0 8px 40px rgba(0,0,0,.6);' +
+          'display:flex;flex-direction:column;overflow:hidden}' +
+        '.usb-title{background:#11151c;color:#e6ebf2;padding:20px 32px;font-size:1.8rem;' +
+          'font-weight:bold;letter-spacing:.5px;border-bottom:1px solid #2a3140;' +
+          'display:flex;align-items:center;gap:16px}' +
+        '.usb-dot{width:14px;height:14px;border-radius:50%;background:#3a86ff}' +
+        '.usb-stage{flex:1;position:relative;background:#0d0f14;overflow:hidden}' +
+        '.usb-idle{position:absolute;inset:0;display:flex;flex-direction:column;' +
+          'align-items:center;justify-content:center;color:#8a94a6;gap:20px}' +
+        '.usb-idle-icon{font-size:6rem;opacity:.6}' +
+        '.usb-idle-text{font-size:1.8rem}' +
+        '.usb-device-list{position:absolute;inset:0;overflow-y:auto;padding:24px;display:none}' +
+        '.usb-section-title{color:#8a94a6;font-size:1.2rem;padding:12px 16px;margin-bottom:12px;' +
+          'border-bottom:1px solid #2a3140;text-transform:uppercase;letter-spacing:1px}' +
+        '.usb-list-item{display:flex;align-items:center;padding:20px 24px;margin:10px 0;' +
+          'background:#161a22;border:2px solid #2a3140;border-radius:14px;color:#e6ebf2;cursor:pointer;transition:all .15s}' +
+        '.usb-list-item:hover{background:#1d2430;border-color:#3a86ff}' +
+        '.usb-list-item.usb-selected{background:#3a86ff;color:#fff;border-color:#3a86ff}' +
+        '.usb-list-icon{font-size:2.5rem;margin-right:20px;min-width:48px;text-align:center}' +
+        '.usb-list-name{font-size:1.5rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}' +
+        '.usb-empty{color:#8a94a6;text-align:center;padding:60px;font-size:1.5rem}' +
+        // Split view styles
+        '.usb-split-view{position:absolute;inset:0;display:none;flex-direction:row}' +
+        '.usb-left-panel{width:280px;background:#11151c;border-right:2px solid #2a3140;' +
+          'display:flex;flex-direction:column;padding:20px 0}' +
+        '.usb-right-panel{flex:1;background:#0d0f14;display:flex;flex-direction:column;overflow:hidden}' +
+        '.usb-cat-item{display:flex;flex-direction:column;align-items:center;justify-content:center;' +
+          'padding:24px 16px;margin:8px 16px;border-radius:16px;color:#8a94a6;cursor:pointer;' +
+          'transition:all .15s;border:2px solid transparent}' +
+        '.usb-cat-item:hover{background:#1d2430;color:#e6ebf2}' +
+        '.usb-cat-item.usb-cat-selected{background:#1d2430;color:#e6ebf2;border-color:#3a86ff}' +
+        '.usb-cat-item.usb-cat-active{background:#3a86ff;color:#fff;border-color:#3a86ff}' +
+        '.usb-cat-icon{font-size:3.5rem;margin-bottom:8px;transition:transform .25s ease}' +
+        '.usb-cat-item.usb-cat-active .usb-cat-icon{transform:scale(1.3)}' +
+        '.usb-cat-name{font-size:1.3rem;font-weight:600;text-align:center;transition:transform .25s ease}' +
+        '.usb-cat-item.usb-cat-active .usb-cat-name{transform:scale(1.5)}' +
+        '.usb-right-header{background:#11151c;color:#ffc239;padding:16px 24px;font-size:1.3rem;' +
+          'font-weight:600;border-bottom:1px solid #2a3140;letter-spacing:.5px}' +
+        '.usb-right-content-wrapper{flex:1;display:flex;flex-direction:row;overflow:hidden;position:relative}' +
+        '.usb-right-content{flex:1;overflow:hidden;padding:16px;display:flex;flex-direction:column}' +
+        '.usb-file-grid{display:grid;grid-template-columns:repeat(4,1fr);grid-template-rows:repeat(3,1fr);' +
+          'gap:12px;flex:1;align-content:start}' +
+        '.usb-file-item{display:flex;flex-direction:column;align-items:center;justify-content:center;' +
+          'padding:16px 8px;background:#161a22;border:3px solid #2a3140;border-radius:16px;color:#e6ebf2;' +
+          'cursor:pointer;transition:all .15s;min-height:0}' +
+        '.usb-file-item:hover{background:#1d2430;border-color:#3a86ff}' +
+        '.usb-file-item.usb-file-selected{background:#3a86ff;color:#fff;border-color:#fff}' +
+        '.usb-file-icon{font-size:3rem;margin-bottom:8px;transition:transform .25s ease}' +
+        '.usb-file-item.usb-file-selected .usb-file-icon{transform:scale(1.3)}' +
+        '.usb-file-name{font-size:1.1rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;' +
+          'max-width:100%;text-align:center;transition:transform .25s ease}' +
+        '.usb-file-item.usb-file-selected .usb-file-name{transform:scale(1.5)}' +
+        '.usb-scrollbar-track{position:absolute;right:4px;top:16px;bottom:16px;width:6px;' +
+          'background:rgba(42,49,64,0.3);border-radius:3px}' +
+        '.usb-scrollbar-thumb{position:absolute;width:100%;background:rgba(138,148,166,0.4);' +
+          'border-radius:3px;transition:top .15s ease-out}' +
+        '</style>' +
+        '<div class="usb-root">' +
+          '<div class="usb-player">' +
+            '<div class="usb-title"><span class="usb-dot"></span>USB Media Player</div>' +
+            '<div class="usb-stage">' +
+              '<div class="usb-idle">' +
+                '<div class="usb-idle-icon">&#128190;</div>' +
+                '<div class="usb-idle-text">No USB device</div>' +
+              '</div>' +
+              '<div class="usb-device-list"></div>' +
+              '<div class="usb-split-view">' +
+                '<div class="usb-left-panel"></div>' +
+                '<div class="usb-right-panel"></div>' +
+              '</div>' +
+            '</div>' +
+          '</div>' +
+        '</div>';
+      stageEl = el.querySelector('.usb-stage');
+      idleEl = el.querySelector('.usb-idle');
+      idleTextEl = el.querySelector('.usb-idle-text');
+      idleIconEl = el.querySelector('.usb-idle-icon');
+      deviceListEl = el.querySelector('.usb-device-list');
+      splitViewEl = el.querySelector('.usb-split-view');
+      leftPanelEl = el.querySelector('.usb-left-panel');
+      rightPanelEl = el.querySelector('.usb-right-panel');
+    },
+
+    onShow: function (params) {
+      isVisible = true;
+      var stored = Shell.store['usb_device_list'];
+      if (stored) {
+        try {
+          var devices = typeof stored === 'string' ? JSON.parse(stored) : stored;
+          updateDeviceList(devices);
+        } catch (e) {
+          updateDeviceList([]);
+        }
+      } else {
+        updateDeviceList([]);
+      }
+      render();
+    },
+
+    onHide: function () {
+      isVisible = false;
+      currentView = 'idle';
+      currentDeviceId = null;
+      folderEntries = [];
+      currentPath = [];
+      navigationStack = [];
+      activePanel = 'left';
+      selectedCategoryIndex = 0;
+      scrollRowOffset = 0;
+    },
+
+    onNav: function (act) {
+      return handleNavAction(act);
+    },
+
+    onVal: function (key, value) {
+      if (key === 'usb_device_list') {
+        try {
+          var devices = typeof value === 'string' ? JSON.parse(value) : value;
+          updateDeviceList(devices);
+        } catch (e) {
+          updateDeviceList([]);
+        }
+      }
+    }
+  });
+})();
