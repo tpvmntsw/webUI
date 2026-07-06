@@ -450,8 +450,16 @@
       idleEl.style.display = 'flex';
       if (idleTextEl) idleTextEl.textContent = 'No USB device';
       if (idleIconEl) {
-        idleIconEl.innerHTML = '&#128190;';
-        idleIconEl.style.color = '#5b6577';
+        // Use the same USB flash drive SVG icon as the device list
+        idleIconEl.innerHTML = '<svg viewBox="0 0 64 64" width="96" height="96" fill="none" xmlns="http://www.w3.org/2000/svg">' +
+          '<rect x="12" y="20" width="40" height="32" rx="4" fill="#3a86ff" stroke="#e6ebf2" stroke-width="2"/>' +
+          '<rect x="22" y="8" width="20" height="14" rx="2" fill="#1d2430" stroke="#e6ebf2" stroke-width="2"/>' +
+          '<rect x="28" y="12" width="3" height="6" rx="1" fill="#e6ebf2"/>' +
+          '<rect x="33" y="12" width="3" height="6" rx="1" fill="#e6ebf2"/>' +
+          '<rect x="18" y="28" width="28" height="4" rx="1" fill="#1d2430" opacity="0.5"/>' +
+          '<circle cx="24" cy="44" r="3" fill="#ffc239"/>' +
+          '</svg>';
+        idleIconEl.style.color = '';
       }
       currentView = 'idle';
     } else if (currentView === 'devices') {
@@ -1387,7 +1395,7 @@
         '.usb-stage{flex:1;position:relative;background:#0d0f14;overflow:hidden}' +
         '.usb-idle{position:absolute;inset:0;display:flex;flex-direction:column;' +
           'align-items:center;justify-content:center;color:#8a94a6;gap:20px}' +
-        '.usb-idle-icon{font-size:6rem;opacity:.6}' +
+        '.usb-idle-icon{opacity:.6;display:flex;align-items:center;justify-content:center}' +
         '.usb-idle-text{font-size:1.8rem}' +
         '.usb-device-list{position:absolute;inset:0;overflow:hidden;display:none}' +
         // Split-panel layout for device list (like Media view)
