@@ -33,6 +33,8 @@
   var playerViewEl = null;
   var optionMenuEl = null;
   var videoInfoEl = null;
+  var fullscreenEl = null;
+  var windowEl = null;
 
   var usbDevices = [];
   var selectedDeviceIndex = 0;
@@ -426,14 +428,23 @@
   };
 
   function render() {
-    if (!idleEl || !deviceListEl || !splitViewEl || !playerViewEl || !optionMenuEl || !videoInfoEl) return;
+    if (!idleEl || !deviceListEl || !splitViewEl || !playerViewEl || !optionMenuEl || !videoInfoEl || !fullscreenEl || !windowEl) return;
 
+    // Hide all views
     idleEl.style.display = 'none';
     deviceListEl.style.display = 'none';
     splitViewEl.style.display = 'none';
     playerViewEl.style.display = 'none';
     optionMenuEl.style.display = 'none';
     videoInfoEl.style.display = 'none';
+
+    // Determine if we're in fullscreen mode (split/playing/option-menu/video-info)
+    var isFullscreenView = (currentView === 'split' || currentView === 'playing' ||
+                            currentView === 'option-menu' || currentView === 'video-info');
+
+    // Toggle between windowed (idle/devices) and fullscreen (split/playing) containers
+    windowEl.style.display = isFullscreenView ? 'none' : 'flex';
+    fullscreenEl.style.display = isFullscreenView ? 'block' : 'none';
 
     if (currentView === 'idle' || (currentView === 'devices' && usbDevices.length === 0)) {
       idleEl.style.display = 'flex';
@@ -1105,6 +1116,29 @@
   // Listen for NAV events directly since source-bound base layer
   // doesn't receive onNav when stack is empty
   var isVisible = false;
+  var allowExitFullscreen = false;
+
+  // Re-enter fullscreen if user presses Esc/F11 while still on USB
+  if (typeof document !== 'undefined') {
+    document.addEventListener('fullscreenchange', function() {
+      if (!document.fullscreenElement && isVisible && !allowExitFullscreen) {
+        var docEl = document.documentElement;
+        if (docEl.requestFullscreen) {
+          docEl.requestFullscreen().catch(function() {});
+        } else if (docEl.webkitRequestFullscreen) {
+          docEl.webkitRequestFullscreen();
+        }
+      }
+    });
+    document.addEventListener('webkitfullscreenchange', function() {
+      if (!document.webkitFullscreenElement && isVisible && !allowExitFullscreen) {
+        var docEl = document.documentElement;
+        if (docEl.webkitRequestFullscreen) {
+          docEl.webkitRequestFullscreen();
+        }
+      }
+    });
+  }
 
   Shell.on('nav', function(act) {
     if (!isVisible) return;
@@ -1249,6 +1283,7 @@
     mount: function (el) {
       // CSS follows slides.html design spec (v6)
       // Colors: --bg:#0d0f14, --fg:#e6ebf2, --dim:#8a94a6, --accent:#3a86ff, --accent2:#ffc239, --card:#161a22, --line:#2a3140
+      // idle/devices: windowed style; split/playing: fullscreen
       el.innerHTML =
         '<style>' +
         '.usb-root{position:absolute;inset:0;background:#0d0f14;display:flex;' +
@@ -1276,88 +1311,90 @@
         '.usb-list-icon{font-size:2.5rem;margin-right:20px;min-width:48px;text-align:center}' +
         '.usb-list-name{font-size:1.5rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}' +
         '.usb-empty{color:#8a94a6;text-align:center;padding:60px;font-size:1.5rem}' +
-        // Split view styles
-        '.usb-split-view{position:absolute;inset:0;display:none;flex-direction:row}' +
-        '.usb-left-panel{width:280px;background:#11151c;border-right:2px solid #2a3140;' +
-          'display:flex;flex-direction:column;justify-content:center;padding:20px 0}' +
+        // Split view styles - fullscreen layout (inside .usb-fullscreen)
+        '.usb-split-view{position:absolute;inset:0;display:none;flex-direction:row;width:1920px;height:1080px}' +
+        '.usb-left-panel{width:320px;background:#11151c;border-right:2px solid #2a3140;' +
+          'display:flex;flex-direction:column;justify-content:center;padding:24px 0}' +
         '.usb-right-panel{flex:1;background:#0d0f14;display:flex;flex-direction:column;overflow:hidden}' +
         '.usb-cat-item{display:flex;flex-direction:column;align-items:center;justify-content:center;' +
-          'padding:20px 16px;margin:10px 16px;border-radius:16px;color:#8a94a6;cursor:pointer;' +
-          'transition:all .15s;border:2px solid transparent}' +
+          'padding:28px 20px;margin:12px 20px;border-radius:18px;color:#8a94a6;cursor:pointer;' +
+          'transition:all .15s;border:3px solid transparent}' +
         '.usb-cat-item:hover{background:#1d2430;color:#e6ebf2}' +
         '.usb-cat-item.usb-cat-selected{background:#1d2430;color:#e6ebf2;border-color:#3a86ff}' +
         '.usb-cat-item.usb-cat-active{background:#3a86ff;color:#fff;border-color:#3a86ff}' +
-        '.usb-cat-icon{font-size:4.2rem;margin-bottom:12px;transition:transform .25s ease}' +
+        '.usb-cat-icon{font-size:5rem;margin-bottom:16px;transition:transform .25s ease}' +
         '.usb-cat-item.usb-cat-active .usb-cat-icon{transform:scale(1.1)}' +
-        '.usb-cat-name{font-size:1.5rem;font-weight:600;text-align:center;transition:transform .25s ease}' +
+        '.usb-cat-name{font-size:1.8rem;font-weight:600;text-align:center;transition:transform .25s ease}' +
         '.usb-cat-item.usb-cat-active .usb-cat-name{transform:scale(1.1)}' +
-        '.usb-right-header{background:#11151c;color:#ffc239;padding:16px 24px;font-size:1.3rem;' +
+        '.usb-right-header{background:#11151c;color:#ffc239;padding:20px 32px;font-size:1.6rem;' +
           'font-weight:600;border-bottom:1px solid #2a3140;letter-spacing:.5px}' +
         '.usb-right-content-wrapper{flex:1;display:flex;flex-direction:row;overflow:hidden;position:relative}' +
-        '.usb-right-content{flex:1;overflow:hidden;padding:16px;display:flex;flex-direction:column}' +
+        '.usb-right-content{flex:1;overflow:hidden;padding:24px;display:flex;flex-direction:column}' +
         '.usb-file-grid{display:grid;grid-template-columns:repeat(4,1fr);grid-template-rows:repeat(3,1fr);' +
-          'gap:12px;flex:1;align-content:start}' +
+          'gap:16px;flex:1;align-content:start}' +
         '.usb-file-item{display:flex;flex-direction:column;align-items:center;justify-content:center;' +
-          'padding:16px 8px;background:#161a22;border:3px solid #2a3140;border-radius:16px;color:#e6ebf2;' +
+          'padding:20px 12px;background:#161a22;border:3px solid #2a3140;border-radius:18px;color:#e6ebf2;' +
           'cursor:pointer;transition:all .15s;min-height:0}' +
         '.usb-file-item:hover{background:#1d2430;border-color:#3a86ff}' +
         '.usb-file-item.usb-file-selected{background:#3a86ff;color:#fff;border-color:#fff}' +
-        '.usb-file-icon{font-size:3rem;margin-bottom:8px;transition:transform .25s ease}' +
+        '.usb-file-icon{font-size:3.6rem;margin-bottom:12px;transition:transform .25s ease}' +
         '.usb-file-item.usb-file-selected .usb-file-icon{transform:scale(1.3)}' +
-        '.usb-file-name{font-size:1.1rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;' +
+        '.usb-file-name{font-size:1.3rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;' +
           'max-width:100%;text-align:center;transition:transform .25s ease}' +
-        '.usb-file-item.usb-file-selected .usb-file-name{transform:scale(1.5)}' +
-        '.usb-scrollbar-track{position:absolute;right:4px;top:16px;bottom:16px;width:6px;' +
-          'background:rgba(42,49,64,0.3);border-radius:3px}' +
+        '.usb-file-item.usb-file-selected .usb-file-name{transform:scale(1.4)}' +
+        '.usb-scrollbar-track{position:absolute;right:8px;top:24px;bottom:24px;width:8px;' +
+          'background:rgba(42,49,64,0.3);border-radius:4px}' +
         '.usb-scrollbar-thumb{position:absolute;width:100%;background:rgba(138,148,166,0.4);' +
-          'border-radius:3px;transition:top .15s ease-out}' +
-        // Player view styles
+          'border-radius:4px;transition:top .15s ease-out}' +
+        // Player view styles - fullscreen playback
         '.usb-player-view{position:absolute;inset:0;display:none;flex-direction:column;' +
-          'align-items:center;justify-content:center;background:#0a0c10;padding:40px}' +
-        '.usb-player-content{display:flex;flex-direction:column;align-items:center;gap:24px}' +
-        '.usb-player-icon{font-size:8rem;opacity:.8}' +
+          'align-items:center;justify-content:center;background:#0a0c10;padding:60px}' +
+        '.usb-player-content{display:flex;flex-direction:column;align-items:center;gap:36px}' +
+        '.usb-player-icon{font-size:12rem;opacity:.8}' +
         '.usb-player-info{text-align:center}' +
-        '.usb-player-filename{color:#e6ebf2;font-size:2rem;font-weight:600;margin-bottom:8px}' +
-        '.usb-player-status{color:#3a86ff;font-size:1.2rem;margin-bottom:20px}' +
+        '.usb-player-filename{color:#e6ebf2;font-size:2.8rem;font-weight:600;margin-bottom:12px}' +
+        '.usb-player-status{color:#3a86ff;font-size:1.6rem;margin-bottom:28px}' +
         '.usb-player-status.usb-paused{color:#ffc239}' +
-        '.usb-player-progress{width:500px}' +
-        '.usb-progress-bar{height:6px;background:#2a3140;border-radius:3px;overflow:hidden}' +
+        '.usb-player-progress{width:800px}' +
+        '.usb-progress-bar{height:8px;background:#2a3140;border-radius:4px;overflow:hidden}' +
         '.usb-progress-fill{height:100%;background:linear-gradient(90deg,#3a86ff,#ffc239);' +
-          'border-radius:3px;transition:width .3s ease-out}' +
-        '.usb-progress-time{display:flex;justify-content:space-between;color:#8a94a6;font-size:0.9rem;margin-top:8px}' +
-        '.usb-player-mode{position:absolute;top:20px;right:24px;background:#3a86ff;color:#fff;' +
-          'padding:8px 16px;border-radius:20px;font-size:1rem}' +
-        '.usb-player-counter{position:absolute;top:20px;left:24px;color:#8a94a6;font-size:1rem}' +
-        '.usb-player-hint{position:absolute;bottom:20px;color:#8a94a6;font-size:0.9rem}' +
+          'border-radius:4px;transition:width .3s ease-out}' +
+        '.usb-progress-time{display:flex;justify-content:space-between;color:#8a94a6;font-size:1.2rem;margin-top:12px}' +
+        '.usb-player-mode{position:absolute;top:40px;right:48px;background:#3a86ff;color:#fff;' +
+          'padding:12px 24px;border-radius:24px;font-size:1.3rem}' +
+        '.usb-player-counter{position:absolute;top:40px;left:48px;color:#8a94a6;font-size:1.3rem}' +
+        '.usb-player-hint{position:absolute;bottom:40px;color:#8a94a6;font-size:1.1rem}' +
         // Option menu styles
         '.usb-option-menu{position:absolute;inset:0;display:none;align-items:center;justify-content:center;' +
           'background:rgba(0,0,0,.7);backdrop-filter:blur(4px)}' +
-        '.usb-option-dialog{background:#161a22;border:2px solid #3a86ff;border-radius:16px;' +
-          'padding:24px;min-width:400px;box-shadow:0 8px 40px rgba(0,0,0,.8)}' +
-        '.usb-option-title{color:#ffc239;font-size:1.5rem;font-weight:600;margin-bottom:20px;text-align:center}' +
-        '.usb-option-item{display:flex;align-items:center;padding:16px 20px;margin:8px 0;' +
-          'background:#0d0f14;border:2px solid #2a3140;border-radius:12px;color:#e6ebf2;cursor:pointer;transition:all .15s}' +
+        '.usb-option-dialog{background:#161a22;border:3px solid #3a86ff;border-radius:20px;' +
+          'padding:32px 40px;min-width:500px;box-shadow:0 12px 60px rgba(0,0,0,.8)}' +
+        '.usb-option-title{color:#ffc239;font-size:1.8rem;font-weight:600;margin-bottom:28px;text-align:center}' +
+        '.usb-option-item{display:flex;align-items:center;padding:20px 24px;margin:10px 0;' +
+          'background:#0d0f14;border:2px solid #2a3140;border-radius:14px;color:#e6ebf2;cursor:pointer;transition:all .15s}' +
         '.usb-option-item:hover{background:#1d2430;border-color:#3a86ff}' +
         '.usb-option-item.usb-option-selected{background:#3a86ff;color:#fff;border-color:#fff}' +
         '.usb-option-item.usb-option-current{border-color:#ffc239}' +
-        '.usb-option-icon{font-size:1.5rem;margin-right:16px;min-width:32px;text-align:center}' +
-        '.usb-option-name{font-size:1.2rem;font-weight:600;margin-right:12px}' +
-        '.usb-option-desc{flex:1;color:#8a94a6;font-size:0.9rem}' +
-        '.usb-option-check{color:#ffc239;font-size:1.2rem;margin-left:auto}' +
-        '.usb-option-hint{color:#8a94a6;font-size:0.85rem;text-align:center;margin-top:16px;padding-top:16px;border-top:1px solid #2a3140}' +
+        '.usb-option-icon{font-size:1.8rem;margin-right:20px;min-width:40px;text-align:center}' +
+        '.usb-option-name{font-size:1.4rem;font-weight:600;margin-right:16px}' +
+        '.usb-option-desc{flex:1;color:#8a94a6;font-size:1.1rem}' +
+        '.usb-option-check{color:#ffc239;font-size:1.4rem;margin-left:auto}' +
+        '.usb-option-hint{color:#8a94a6;font-size:1rem;text-align:center;margin-top:20px;padding-top:20px;border-top:1px solid #2a3140}' +
         // Video info dialog styles
         '.usb-video-info{position:absolute;inset:0;display:none;align-items:center;justify-content:center;' +
           'background:rgba(0,0,0,.7);backdrop-filter:blur(4px)}' +
-        '.usb-video-info-dialog{background:#4a5568;border:2px solid #718096;border-radius:12px;' +
-          'padding:24px 32px;min-width:380px;box-shadow:0 8px 40px rgba(0,0,0,.8)}' +
-        '.usb-video-info-title{color:#e2e8f0;font-size:1.6rem;font-weight:600;margin-bottom:20px}' +
-        '.usb-video-info-content{margin-bottom:24px}' +
-        '.usb-video-info-row{color:#e2e8f0;font-size:1.2rem;margin:8px 0;line-height:1.6}' +
+        '.usb-video-info-dialog{background:#4a5568;border:3px solid #718096;border-radius:16px;' +
+          'padding:32px 48px;min-width:480px;box-shadow:0 12px 60px rgba(0,0,0,.8)}' +
+        '.usb-video-info-title{color:#e2e8f0;font-size:2rem;font-weight:600;margin-bottom:28px}' +
+        '.usb-video-info-content{margin-bottom:32px}' +
+        '.usb-video-info-row{color:#e2e8f0;font-size:1.4rem;margin:12px 0;line-height:1.6}' +
         '.usb-video-info-label{color:#e2e8f0;font-weight:600}' +
         '.usb-video-info-close{display:block;width:100%;background:#3182ce;color:#fff;border:none;' +
-          'border-radius:24px;padding:12px 24px;font-size:1.1rem;font-weight:600;cursor:pointer;' +
+          'border-radius:28px;padding:16px 32px;font-size:1.3rem;font-weight:600;cursor:pointer;' +
           'transition:background .15s}' +
         '.usb-video-info-close:hover{background:#2b6cb0}' +
+        // Fullscreen views (split/playing) - positioned outside usb-player window
+        '.usb-fullscreen{position:absolute;inset:0;display:none;background:#0d0f14}' +
         '</style>' +
         '<div class="usb-root">' +
           '<div class="usb-player">' +
@@ -1368,14 +1405,16 @@
                 '<div class="usb-idle-text">No USB device</div>' +
               '</div>' +
               '<div class="usb-device-list"></div>' +
-              '<div class="usb-split-view">' +
-                '<div class="usb-left-panel"></div>' +
-                '<div class="usb-right-panel"></div>' +
-              '</div>' +
-              '<div class="usb-player-view"></div>' +
-              '<div class="usb-option-menu"></div>' +
-              '<div class="usb-video-info"></div>' +
             '</div>' +
+          '</div>' +
+          '<div class="usb-fullscreen">' +
+            '<div class="usb-split-view">' +
+              '<div class="usb-left-panel"></div>' +
+              '<div class="usb-right-panel"></div>' +
+            '</div>' +
+            '<div class="usb-player-view"></div>' +
+            '<div class="usb-option-menu"></div>' +
+            '<div class="usb-video-info"></div>' +
           '</div>' +
         '</div>';
       stageEl = el.querySelector('.usb-stage');
@@ -1383,6 +1422,8 @@
       idleTextEl = el.querySelector('.usb-idle-text');
       idleIconEl = el.querySelector('.usb-idle-icon');
       deviceListEl = el.querySelector('.usb-device-list');
+      fullscreenEl = el.querySelector('.usb-fullscreen');
+      windowEl = el.querySelector('.usb-player');
       splitViewEl = el.querySelector('.usb-split-view');
       leftPanelEl = el.querySelector('.usb-left-panel');
       rightPanelEl = el.querySelector('.usb-right-panel');
@@ -1393,6 +1434,17 @@
 
     onShow: function (params) {
       isVisible = true;
+      allowExitFullscreen = false;
+      // Enter browser fullscreen mode (hide URL bar and Windows chrome)
+      var docEl = document.documentElement;
+      if (docEl.requestFullscreen) {
+        docEl.requestFullscreen().catch(function() {});
+      } else if (docEl.webkitRequestFullscreen) {
+        docEl.webkitRequestFullscreen();
+      } else if (docEl.msRequestFullscreen) {
+        docEl.msRequestFullscreen();
+      }
+
       var stored = Shell.store['usb_device_list'];
       if (stored) {
         try {
@@ -1409,6 +1461,18 @@
 
     onHide: function () {
       isVisible = false;
+      // Exit browser fullscreen mode (only when switching away from USB)
+      allowExitFullscreen = true;
+      if (document.fullscreenElement || document.webkitFullscreenElement || document.msFullscreenElement) {
+        if (document.exitFullscreen) {
+          document.exitFullscreen().catch(function() {});
+        } else if (document.webkitExitFullscreen) {
+          document.webkitExitFullscreen();
+        } else if (document.msExitFullscreen) {
+          document.msExitFullscreen();
+        }
+      }
+
       stopPlaybackTimer();
       currentView = 'idle';
       currentDeviceId = null;
@@ -1448,6 +1512,9 @@
       if (!isVisible) return;
       // Only handle if no overlay is on top (stack is empty)
       if (Shell.stack.length > 0) return;
+      // Ignore keystrokes when typing in input fields (e.g. USB simulation textbox)
+      var tag = e.target.tagName.toLowerCase();
+      if (tag === 'input' || tag === 'textarea' || e.target.isContentEditable) return;
 
       var handled = false;
       switch (e.key) {
