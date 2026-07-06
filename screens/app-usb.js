@@ -513,17 +513,46 @@
     var startIdx = deviceScrollOffset;
     var endIdx = Math.min(startIdx + DEVICE_VISIBLE_COUNT, total);
 
-    var html = '<div class="usb-device-list-wrapper">';
-    html += '<div class="usb-section-title">USB Devices</div>';
-    html += '<div class="usb-device-items">';
+    // Split-panel layout: left icon panel + right device list
+    var html = '<div class="usb-device-split">';
+
+    // Left panel - USB icon and title
+    html += '<div class="usb-device-left-panel">';
+    // USB flash drive SVG icon
+    var usbFlashSvg = '<svg viewBox="0 0 64 64" width="120" height="120" fill="none" xmlns="http://www.w3.org/2000/svg">' +
+      '<rect x="12" y="20" width="40" height="32" rx="4" fill="#3a86ff" stroke="#e6ebf2" stroke-width="2"/>' +
+      '<rect x="22" y="8" width="20" height="14" rx="2" fill="#1d2430" stroke="#e6ebf2" stroke-width="2"/>' +
+      '<rect x="28" y="12" width="3" height="6" rx="1" fill="#e6ebf2"/>' +
+      '<rect x="33" y="12" width="3" height="6" rx="1" fill="#e6ebf2"/>' +
+      '<rect x="18" y="28" width="28" height="4" rx="1" fill="#1d2430" opacity="0.5"/>' +
+      '<circle cx="24" cy="44" r="3" fill="#ffc239"/>' +
+      '</svg>';
+    html += '<div class="usb-device-icon-wrap">' + usbFlashSvg + '</div>';
+    html += '<div class="usb-device-panel-title">USB Devices</div>';
+    html += '</div>';
+
+    // Right panel - device list (7 rows)
+    html += '<div class="usb-device-right-panel">';
+    html += '<div class="usb-device-right-content">';
+    // Small USB flash drive icon for list items
+    var usbSmallSvg = '<svg viewBox="0 0 64 64" width="32" height="32" fill="none" xmlns="http://www.w3.org/2000/svg">' +
+      '<rect x="12" y="20" width="40" height="32" rx="4" fill="#3a86ff" stroke="currentColor" stroke-width="2"/>' +
+      '<rect x="22" y="8" width="20" height="14" rx="2" fill="#1d2430" stroke="currentColor" stroke-width="2"/>' +
+      '<rect x="28" y="12" width="3" height="6" rx="1" fill="currentColor"/>' +
+      '<rect x="33" y="12" width="3" height="6" rx="1" fill="currentColor"/>' +
+      '</svg>';
     for (var i = startIdx; i < endIdx; i++) {
       var device = usbDevices[i];
-      var cls = 'usb-list-item' + (i === selectedDeviceIndex ? ' usb-selected' : '');
+      var cls = 'usb-device-row' + (i === selectedDeviceIndex ? ' usb-device-row-selected' : '');
       var displayName = device.label || device.name || ('USB Device ' + (i + 1));
       html += '<div class="' + cls + '" data-index="' + i + '">' +
-        '<span class="usb-list-icon">&#128190;</span>' +
-        '<span class="usb-list-name">' + escapeHtml(displayName) + '</span>' +
+        '<span class="usb-device-row-icon">' + usbSmallSvg + '</span>' +
+        '<span class="usb-device-row-name">' + escapeHtml(displayName) + '</span>' +
         '</div>';
+    }
+    // Fill empty rows to maintain 7 rows
+    for (var j = endIdx - startIdx; j < DEVICE_VISIBLE_COUNT; j++) {
+      html += '<div class="usb-device-row usb-device-row-empty"></div>';
     }
     html += '</div>';
 
@@ -536,6 +565,8 @@
         '<div class="usb-device-scrollbar-thumb" style="height:' + scrollbarHeight + '%;top:' + scrollbarTop + '%"></div>' +
         '</div>';
     }
+    html += '</div>';
+
     html += '</div>';
 
     deviceListEl.innerHTML = html;
@@ -1358,21 +1389,27 @@
           'align-items:center;justify-content:center;color:#8a94a6;gap:20px}' +
         '.usb-idle-icon{font-size:6rem;opacity:.6}' +
         '.usb-idle-text{font-size:1.8rem}' +
-        '.usb-device-list{position:absolute;inset:0;overflow:hidden;padding:24px;display:none}' +
-        '.usb-device-list-wrapper{position:relative;height:100%;display:flex;flex-direction:row}' +
-        '.usb-device-items{flex:1;display:flex;flex-direction:column}' +
-        '.usb-device-scrollbar-track{position:absolute;right:4px;top:60px;bottom:16px;width:6px;' +
+        '.usb-device-list{position:absolute;inset:0;overflow:hidden;display:none}' +
+        // Split-panel layout for device list (like Media view)
+        '.usb-device-split{display:flex;flex-direction:row;height:100%;width:100%}' +
+        '.usb-device-left-panel{width:280px;background:#11151c;border-right:2px solid #2a3140;' +
+          'display:flex;flex-direction:column;align-items:center;justify-content:center;padding:32px 20px}' +
+        '.usb-device-icon-wrap{margin-bottom:24px;display:flex;align-items:center;justify-content:center}' +
+        '.usb-device-panel-title{font-size:1.6rem;font-weight:600;color:#e6ebf2;text-align:center;letter-spacing:.5px}' +
+        '.usb-device-right-panel{flex:1;background:#0d0f14;display:flex;flex-direction:row;position:relative;overflow:hidden}' +
+        '.usb-device-right-content{flex:1;display:flex;flex-direction:column;padding:16px 24px;gap:8px}' +
+        '.usb-device-row{display:flex;align-items:center;padding:18px 24px;' +
+          'background:#161a22;border:2px solid #2a3140;border-radius:12px;color:#e6ebf2;cursor:pointer;transition:all .15s}' +
+        '.usb-device-row:hover{background:#1d2430;border-color:#3a86ff}' +
+        '.usb-device-row.usb-device-row-selected{background:#3a86ff;color:#fff;border-color:#fff}' +
+        '.usb-device-row.usb-device-row-empty{background:transparent;border-color:transparent;cursor:default}' +
+        '.usb-device-row.usb-device-row-empty:hover{background:transparent;border-color:transparent}' +
+        '.usb-device-row-icon{margin-right:16px;min-width:40px;display:flex;align-items:center;justify-content:center}' +
+        '.usb-device-row-name{font-size:1.4rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}' +
+        '.usb-device-scrollbar-track{position:absolute;right:8px;top:16px;bottom:16px;width:6px;' +
           'background:rgba(42,49,64,0.3);border-radius:3px}' +
         '.usb-device-scrollbar-thumb{position:absolute;width:100%;background:rgba(138,148,166,0.4);' +
           'border-radius:3px;transition:top .15s ease-out}' +
-        '.usb-section-title{color:#8a94a6;font-size:1.2rem;padding:12px 16px;margin-bottom:12px;' +
-          'border-bottom:1px solid #2a3140;text-transform:uppercase;letter-spacing:1px}' +
-        '.usb-list-item{display:flex;align-items:center;padding:22px 28px;margin:8px 0;' +
-          'background:#161a22;border:2px solid #2a3140;border-radius:14px;color:#e6ebf2;cursor:pointer;transition:all .15s}' +
-        '.usb-list-item:hover{background:#1d2430;border-color:#3a86ff}' +
-        '.usb-list-item.usb-selected{background:#3a86ff;color:#fff;border-color:#3a86ff}' +
-        '.usb-list-icon{font-size:2.4rem;margin-right:20px;min-width:48px;text-align:center}' +
-        '.usb-list-name{font-size:1.5rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}' +
         '.usb-empty{color:#8a94a6;text-align:center;padding:60px;font-size:1.5rem}' +
         // Split view styles - fullscreen layout (inside .usb-fullscreen)
         '.usb-split-view{position:absolute;inset:0;display:none;flex-direction:row;width:1920px;height:1080px}' +
