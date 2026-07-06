@@ -94,10 +94,9 @@
 
   // Categories for USB content
   var CATEGORIES = [
-    { id: 'folders', name: 'Folder', icon: '&#128193;' },
-    { id: 'music', name: 'Music', icon: '&#127925;' },
-    { id: 'video', name: 'Video', icon: '&#127910;' },
-    { id: 'photo', name: 'Photo', icon: '&#128444;' }
+    { id: 'video', name: 'Videos', icon: '&#127910;' },
+    { id: 'photo', name: 'Photos', icon: '&#128444;' },
+    { id: 'music', name: 'Music', icon: '&#127925;' }
   ];
 
   // Mock data for each category (20+ items per root)
@@ -1093,18 +1092,18 @@
         // Split view styles
         '.usb-split-view{position:absolute;inset:0;display:none;flex-direction:row}' +
         '.usb-left-panel{width:280px;background:#11151c;border-right:2px solid #2a3140;' +
-          'display:flex;flex-direction:column;padding:20px 0}' +
+          'display:flex;flex-direction:column;justify-content:center;padding:20px 0}' +
         '.usb-right-panel{flex:1;background:#0d0f14;display:flex;flex-direction:column;overflow:hidden}' +
         '.usb-cat-item{display:flex;flex-direction:column;align-items:center;justify-content:center;' +
-          'padding:24px 16px;margin:8px 16px;border-radius:16px;color:#8a94a6;cursor:pointer;' +
+          'padding:20px 16px;margin:10px 16px;border-radius:16px;color:#8a94a6;cursor:pointer;' +
           'transition:all .15s;border:2px solid transparent}' +
         '.usb-cat-item:hover{background:#1d2430;color:#e6ebf2}' +
         '.usb-cat-item.usb-cat-selected{background:#1d2430;color:#e6ebf2;border-color:#3a86ff}' +
         '.usb-cat-item.usb-cat-active{background:#3a86ff;color:#fff;border-color:#3a86ff}' +
-        '.usb-cat-icon{font-size:3.5rem;margin-bottom:8px;transition:transform .25s ease}' +
-        '.usb-cat-item.usb-cat-active .usb-cat-icon{transform:scale(1.3)}' +
-        '.usb-cat-name{font-size:1.3rem;font-weight:600;text-align:center;transition:transform .25s ease}' +
-        '.usb-cat-item.usb-cat-active .usb-cat-name{transform:scale(1.5)}' +
+        '.usb-cat-icon{font-size:4.2rem;margin-bottom:12px;transition:transform .25s ease}' +
+        '.usb-cat-item.usb-cat-active .usb-cat-icon{transform:scale(1.1)}' +
+        '.usb-cat-name{font-size:1.5rem;font-weight:600;text-align:center;transition:transform .25s ease}' +
+        '.usb-cat-item.usb-cat-active .usb-cat-name{transform:scale(1.1)}' +
         '.usb-right-header{background:#11151c;color:#ffc239;padding:16px 24px;font-size:1.3rem;' +
           'font-weight:600;border-bottom:1px solid #2a3140;letter-spacing:.5px}' +
         '.usb-right-content-wrapper{flex:1;display:flex;flex-direction:row;overflow:hidden;position:relative}' +
