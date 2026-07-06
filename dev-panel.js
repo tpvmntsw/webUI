@@ -10,9 +10,19 @@
   if (typeof document === 'undefined') return; // headless: no-op
 
   var NAV_KEYS = ['MENU', 'SOURCE', 'UP', 'DOWN', 'LEFT', 'RIGHT', 'OK', 'BACK',
-                  'VOL+', 'VOL-', 'MUTE', 'DISPLAY'];
+                  'VOL+', 'VOL-', 'MUTE', 'DISPLAY', 'OPTION'];
   var DIGITS = ['0','1','2','3','4','5','6','7','8','9'];
   var SOURCE_TOKENS = ['HOME', 'HDMI1', 'HDMI2', 'HDMI3', 'USB'];
+
+  // Playback control keys with SVG icons
+  var PLAYBACK_KEYS = [
+    { key: 'PLAY', icon: '<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>', title: 'Play/Pause' },
+    { key: 'STOP', icon: '<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12"/></svg>', title: 'Stop' },
+    { key: 'REW', icon: '<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M11 18V6l-8.5 6 8.5 6zm.5-6l8.5 6V6l-8.5 6z"/></svg>', title: 'Rewind' },
+    { key: 'FF', icon: '<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M4 18l8.5-6L4 6v12zm9-12v12l8.5-6L13 6z"/></svg>', title: 'Fast Forward' },
+    { key: 'PREV_FRAME', icon: '<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M6 6h2v12H6zm3.5 6l8.5 6V6z"/></svg>', title: 'Previous Frame' },
+    { key: 'NEXT_FRAME', icon: '<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M16 6h2v12h-2zM6 18l8.5-6L6 6z"/></svg>', title: 'Next Frame' }
+  ];
 
   function el(tag, props, html) {
     var e = document.createElement(tag);
@@ -50,6 +60,19 @@
     panel.appendChild(btnRow(NAV_KEYS, function (k) { mock.pushNav(k); }));
     panel.appendChild(el('div', { color: '#789' }, 'Digits (Menu+1+9+9+9 = Factory):'));
     panel.appendChild(btnRow(DIGITS, function (k) { mock.pushNav(k); }));
+
+    // Playback controls with SVG icons
+    panel.appendChild(el('div', { color: '#789', marginTop: '6px' }, 'Playback:'));
+    var playbackRow = el('div', { display: 'flex', flexWrap: 'wrap', gap: '3px', marginBottom: '5px' });
+    PLAYBACK_KEYS.forEach(function (item) {
+      var b = el('button', null);
+      b.innerHTML = item.icon;
+      b.title = item.title;
+      b.style.cssText = 'background:#234;color:#cde;border:1px solid #456;border-radius:3px;padding:4px 6px;cursor:pointer;display:flex;align-items:center;justify-content:center;min-width:28px;height:24px';
+      b.onclick = function () { mock.pushNav(item.key); };
+      playbackRow.appendChild(b);
+    });
+    panel.appendChild(playbackRow);
 
     // no_signal + signal lock
     var sigRow = el('div', { display: 'flex', gap: '3px', marginBottom: '5px' });

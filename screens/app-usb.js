@@ -30,10 +30,12 @@
   var rightPanelEl = null;
   var idleTextEl = null;
   var idleIconEl = null;
+  var playerViewEl = null;
+  var optionMenuEl = null;
 
   var usbDevices = [];
   var selectedDeviceIndex = 0;
-  // 'idle' | 'devices' | 'split'
+  // 'idle' | 'devices' | 'split' | 'playing' | 'option-menu'
   var currentView = 'idle';
   var currentDeviceId = null;
   // 'left' | 'right' - which panel is active
@@ -43,6 +45,52 @@
   var selectedFolderIndex = 0;
   var currentPath = [];
   var navigationStack = [];
+
+  // Playback state
+  var playbackTimer = null;
+  var playbackElapsed = 0;
+  var playbackDuration = 0;
+  var isPaused = false;
+  var currentPlayingFile = null;
+  var playbackMode = 'repeat-all'; // 'single' | 'repeat-one' | 'repeat-all' | 'shuffle'
+  var selectedModeIndex = 2;
+  var playableFiles = []; // filtered list of playable files in current folder
+  var currentPlayingIndex = -1;
+
+  // Playback modes
+  var PLAYBACK_MODES = [
+    { id: 'single', name: 'Single', icon: '&#9654;', desc: 'Play once and stop' },
+    { id: 'repeat-one', name: 'Repeat One', icon: '&#128257;', desc: 'Repeat current file' },
+    { id: 'repeat-all', name: 'Repeat All', icon: '&#128256;', desc: 'Repeat all files' },
+    { id: 'shuffle', name: 'Shuffle', icon: '&#128256;', desc: 'Random playback' }
+  ];
+
+  // Mock duration for files (in real implementation, backend would provide this)
+  function getFileDuration(filename) {
+    var ext = (filename.split('.').pop() || '').toLowerCase();
+    var videoExts = ['mp4', 'mkv', 'avi', 'mov', 'wmv', 'flv', 'webm'];
+    var audioExts = ['mp3', 'wav', 'flac', 'aac', 'ogg', 'wma'];
+    var imageExts = ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp', 'svg'];
+
+    if (videoExts.indexOf(ext) !== -1) return Math.floor(Math.random() * 180) + 60; // 1-4 min
+    if (audioExts.indexOf(ext) !== -1) return Math.floor(Math.random() * 240) + 120; // 2-6 min
+    if (imageExts.indexOf(ext) !== -1) return 5; // 5 sec for photos
+    return 10;
+  }
+
+  function formatDuration(seconds) {
+    var mins = Math.floor(seconds / 60);
+    var secs = seconds % 60;
+    return (mins < 10 ? '0' : '') + mins + ':' + (secs < 10 ? '0' : '') + secs;
+  }
+
+  function isPlayableFile(filename) {
+    var ext = (filename.split('.').pop() || '').toLowerCase();
+    var playableExts = ['mp4', 'mkv', 'avi', 'mov', 'wmv', 'flv', 'webm',
+                        'mp3', 'wav', 'flac', 'aac', 'ogg', 'wma',
+                        'jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp', 'svg'];
+    return playableExts.indexOf(ext) !== -1;
+  }
 
   // Categories for USB content
   var CATEGORIES = [
@@ -320,11 +368,13 @@
   };
 
   function render() {
-    if (!idleEl || !deviceListEl || !splitViewEl) return;
+    if (!idleEl || !deviceListEl || !splitViewEl || !playerViewEl || !optionMenuEl) return;
 
     idleEl.style.display = 'none';
     deviceListEl.style.display = 'none';
     splitViewEl.style.display = 'none';
+    playerViewEl.style.display = 'none';
+    optionMenuEl.style.display = 'none';
 
     if (currentView === 'idle' || (currentView === 'devices' && usbDevices.length === 0)) {
       idleEl.style.display = 'flex';
@@ -341,6 +391,14 @@
       splitViewEl.style.display = 'flex';
       renderLeftPanel();
       renderRightPanel();
+    } else if (currentView === 'playing') {
+      playerViewEl.style.display = 'flex';
+      renderPlayer();
+    } else if (currentView === 'option-menu') {
+      playerViewEl.style.display = 'flex';
+      optionMenuEl.style.display = 'flex';
+      renderPlayer();
+      renderOptionMenu();
     }
   }
 
@@ -476,6 +534,204 @@
     var div = document.createElement('div');
     div.textContent = str;
     return div.innerHTML;
+  }
+
+  function renderPlayer() {
+    if (!playerViewEl || !currentPlayingFile) return;
+    var modeInfo = PLAYBACK_MODES.find(function(m) { return m.id === playbackMode; });
+    var progressPercent = playbackDuration > 0 ? (playbackElapsed / playbackDuration) * 100 : 0;
+    var statusText = isPaused ? 'Paused' : 'Playing';
+    var statusIcon = isPaused ? '&#10074;&#10074;' : '&#9654;';
+    var fileIcon = getFileIcon(currentPlayingFile.name);
+
+    playerViewEl.innerHTML =
+      '<div class="usb-player-content">' +
+        '<div class="usb-player-icon">' + fileIcon + '</div>' +
+        '<div class="usb-player-info">' +
+          '<div class="usb-player-filename">' + escapeHtml(currentPlayingFile.name) + '</div>' +
+          '<div class="usb-player-status' + (isPaused ? ' usb-paused' : '') + '">' + statusIcon + ' ' + statusText + '</div>' +
+          '<div class="usb-player-progress">' +
+            '<div class="usb-progress-bar"><div class="usb-progress-fill" style="width:' + progressPercent + '%"></div></div>' +
+            '<div class="usb-progress-time"><span>' + formatDuration(playbackElapsed) + '</span><span>' + formatDuration(playbackDuration) + '</span></div>' +
+          '</div>' +
+        '</div>' +
+      '</div>' +
+      '<div class="usb-player-mode">' + modeInfo.icon + ' ' + modeInfo.name + '</div>' +
+      '<div class="usb-player-counter">' + (currentPlayingIndex + 1) + ' / ' + playableFiles.length + '</div>';
+  }
+
+  function renderOptionMenu() {
+    if (!optionMenuEl) return;
+    var html = '<div class="usb-option-dialog">' +
+      '<div class="usb-option-title">Playback Mode</div>';
+
+    for (var i = 0; i < PLAYBACK_MODES.length; i++) {
+      var mode = PLAYBACK_MODES[i];
+      var isSelected = (i === selectedModeIndex);
+      var isCurrent = (mode.id === playbackMode);
+      var cls = 'usb-option-item' + (isSelected ? ' usb-option-selected' : '') + (isCurrent ? ' usb-option-current' : '');
+      html += '<div class="' + cls + '">' +
+        '<span class="usb-option-icon">' + mode.icon + '</span>' +
+        '<span class="usb-option-name">' + mode.name + '</span>' +
+        '<span class="usb-option-desc">' + mode.desc + '</span>' +
+        (isCurrent ? '<span class="usb-option-check">&#10003;</span>' : '') +
+        '</div>';
+    }
+
+    html += '<div class="usb-option-hint">UP/DOWN: Select | OK: Confirm | BACK: Cancel</div>';
+    html += '</div>';
+    optionMenuEl.innerHTML = html;
+  }
+
+  // Playback timer functions
+  function stopPlaybackTimer() {
+    if (playbackTimer) {
+      clearInterval(playbackTimer);
+      playbackTimer = null;
+    }
+  }
+
+  function startPlaybackTimer() {
+    stopPlaybackTimer();
+    if (!currentPlayingFile) return;
+
+    playbackDuration = getFileDuration(currentPlayingFile.name);
+    playbackElapsed = 0;
+    isPaused = false;
+
+    playbackTimer = setInterval(function() {
+      if (!isPaused) {
+        playbackElapsed++;
+        if (playbackElapsed >= playbackDuration) {
+          onPlaybackComplete();
+          return;
+        }
+      }
+      if (currentView === 'playing' || currentView === 'option-menu') {
+        renderPlayer();
+      }
+    }, 1000);
+  }
+
+  function togglePause() {
+    isPaused = !isPaused;
+    renderPlayer();
+  }
+
+  function seekForward(seconds) {
+    playbackElapsed = Math.min(playbackDuration - 1, playbackElapsed + seconds);
+    renderPlayer();
+  }
+
+  function seekBackward(seconds) {
+    playbackElapsed = Math.max(0, playbackElapsed - seconds);
+    renderPlayer();
+  }
+
+  function stepFrame(forward) {
+    if (forward) {
+      playbackElapsed = Math.min(playbackDuration - 1, playbackElapsed + 1);
+    } else {
+      playbackElapsed = Math.max(0, playbackElapsed - 1);
+    }
+    isPaused = true;
+    renderPlayer();
+  }
+
+  function onPlaybackComplete() {
+    stopPlaybackTimer();
+
+    if (playbackMode === 'single') {
+      currentView = 'split';
+      render();
+    } else if (playbackMode === 'repeat-one') {
+      startPlaybackTimer();
+    } else if (playbackMode === 'repeat-all') {
+      var nextIndex = (currentPlayingIndex + 1) % playableFiles.length;
+      playFileAtIndex(nextIndex);
+    } else if (playbackMode === 'shuffle') {
+      var nextIndex = Math.floor(Math.random() * playableFiles.length);
+      playFileAtIndex(nextIndex);
+    }
+  }
+
+  function buildPlayableList() {
+    playableFiles = [];
+    for (var i = 0; i < folderEntries.length; i++) {
+      var entry = folderEntries[i];
+      if (!entry.isDirectory && isPlayableFile(entry.name)) {
+        playableFiles.push(entry);
+      }
+    }
+  }
+
+  function playFileAtIndex(index) {
+    if (index >= 0 && index < playableFiles.length) {
+      stopPlaybackTimer();
+      currentPlayingIndex = index;
+      currentPlayingFile = playableFiles[index];
+      currentView = 'playing';
+      startPlaybackTimer();
+      render();
+    }
+  }
+
+  function playFile(entry) {
+    buildPlayableList();
+    currentPlayingIndex = -1;
+    for (var i = 0; i < playableFiles.length; i++) {
+      if (playableFiles[i].name === entry.name) {
+        currentPlayingIndex = i;
+        break;
+      }
+    }
+    if (currentPlayingIndex === -1 && playableFiles.length > 0) {
+      currentPlayingIndex = 0;
+    }
+    currentPlayingFile = entry;
+    currentView = 'playing';
+    startPlaybackTimer();
+    render();
+  }
+
+  function playNext() {
+    if (playableFiles.length === 0) return;
+    var nextIndex;
+    if (playbackMode === 'shuffle') {
+      nextIndex = Math.floor(Math.random() * playableFiles.length);
+    } else {
+      nextIndex = (currentPlayingIndex + 1) % playableFiles.length;
+    }
+    playFileAtIndex(nextIndex);
+  }
+
+  function playPrev() {
+    if (playableFiles.length === 0) return;
+    var prevIndex = (currentPlayingIndex - 1 + playableFiles.length) % playableFiles.length;
+    playFileAtIndex(prevIndex);
+  }
+
+  function stopPlayback() {
+    stopPlaybackTimer();
+    currentPlayingFile = null;
+    currentPlayingIndex = -1;
+    playbackElapsed = 0;
+    isPaused = false;
+    currentView = 'split';
+    render();
+  }
+
+  function openOptionMenu() {
+    selectedModeIndex = PLAYBACK_MODES.findIndex(function(m) { return m.id === playbackMode; });
+    if (selectedModeIndex < 0) selectedModeIndex = 2;
+    currentView = 'option-menu';
+    render();
+  }
+
+  function confirmModeSelection() {
+    playbackMode = PLAYBACK_MODES[selectedModeIndex].id;
+    currentView = 'playing';
+    render();
   }
 
   function updateDeviceList(devices) {
@@ -638,13 +894,26 @@
         var entry = folderEntries[selectedFolderIndex];
         if (entry.isDirectory) {
           enterFolder(entry.name);
+        } else if (isPlayableFile(entry.name)) {
+          playFile(entry);
         }
       }
+    } else if (currentView === 'playing') {
+      togglePause();
+    } else if (currentView === 'option-menu') {
+      confirmModeSelection();
     }
   }
 
   function goBack() {
-    if (currentView === 'split') {
+    if (currentView === 'playing') {
+      stopPlayback();
+      return true;
+    } else if (currentView === 'option-menu') {
+      currentView = 'playing';
+      render();
+      return true;
+    } else if (currentView === 'split') {
       if (activePanel === 'right') {
         if (navigationStack.length > 0) {
           var prev = navigationStack.pop();
@@ -692,6 +961,67 @@
       return false;
     }
 
+    // Handle playback controls in playing/option-menu views
+    if (currentView === 'playing') {
+      switch (act) {
+        case 'PLAY':
+        case 'OK':
+          togglePause();
+          return true;
+        case 'STOP':
+          stopPlayback();
+          return true;
+        case 'FF':
+          seekForward(10);
+          return true;
+        case 'REW':
+          seekBackward(10);
+          return true;
+        case 'NEXT_FRAME':
+          stepFrame(true);
+          return true;
+        case 'PREV_FRAME':
+          stepFrame(false);
+          return true;
+        case 'LEFT':
+          playPrev();
+          return true;
+        case 'RIGHT':
+          playNext();
+          return true;
+        case 'OPTION':
+          openOptionMenu();
+          return true;
+        case 'BACK':
+          return goBack();
+      }
+      return false;
+    }
+
+    if (currentView === 'option-menu') {
+      switch (act) {
+        case 'UP':
+          if (selectedModeIndex > 0) {
+            selectedModeIndex--;
+            renderOptionMenu();
+          }
+          return true;
+        case 'DOWN':
+          if (selectedModeIndex < PLAYBACK_MODES.length - 1) {
+            selectedModeIndex++;
+            renderOptionMenu();
+          }
+          return true;
+        case 'OK':
+          confirmModeSelection();
+          return true;
+        case 'BACK':
+          return goBack();
+      }
+      return false;
+    }
+
+    // Handle split/devices views
     switch (act) {
       case 'UP':
         moveSelectionVertical(-1);
@@ -708,6 +1038,19 @@
         return true;
       case 'BACK':
         return goBack();
+      case 'PLAY':
+        // If in split view with a playable file selected, play it
+        if (currentView === 'split' && activePanel === 'right' && folderEntries.length > 0) {
+          var entry = folderEntries[selectedFolderIndex];
+          if (!entry.isDirectory && isPlayableFile(entry.name)) {
+            playFile(entry);
+            return true;
+          }
+        }
+        return false;
+      case 'OPTION':
+        // Option key in split view - could show playback mode preview
+        return false;
     }
     return false;
   }
@@ -782,6 +1125,40 @@
           'background:rgba(42,49,64,0.3);border-radius:3px}' +
         '.usb-scrollbar-thumb{position:absolute;width:100%;background:rgba(138,148,166,0.4);' +
           'border-radius:3px;transition:top .15s ease-out}' +
+        // Player view styles
+        '.usb-player-view{position:absolute;inset:0;display:none;flex-direction:column;' +
+          'align-items:center;justify-content:center;background:#0a0c10;padding:40px}' +
+        '.usb-player-content{display:flex;flex-direction:column;align-items:center;gap:24px}' +
+        '.usb-player-icon{font-size:8rem;opacity:.8}' +
+        '.usb-player-info{text-align:center}' +
+        '.usb-player-filename{color:#e6ebf2;font-size:2rem;font-weight:600;margin-bottom:8px}' +
+        '.usb-player-status{color:#3a86ff;font-size:1.2rem;margin-bottom:20px}' +
+        '.usb-player-status.usb-paused{color:#ffc239}' +
+        '.usb-player-progress{width:500px}' +
+        '.usb-progress-bar{height:6px;background:#2a3140;border-radius:3px;overflow:hidden}' +
+        '.usb-progress-fill{height:100%;background:linear-gradient(90deg,#3a86ff,#ffc239);' +
+          'border-radius:3px;transition:width .3s ease-out}' +
+        '.usb-progress-time{display:flex;justify-content:space-between;color:#8a94a6;font-size:0.9rem;margin-top:8px}' +
+        '.usb-player-mode{position:absolute;top:20px;right:24px;background:#3a86ff;color:#fff;' +
+          'padding:8px 16px;border-radius:20px;font-size:1rem}' +
+        '.usb-player-counter{position:absolute;top:20px;left:24px;color:#8a94a6;font-size:1rem}' +
+        '.usb-player-hint{position:absolute;bottom:20px;color:#8a94a6;font-size:0.9rem}' +
+        // Option menu styles
+        '.usb-option-menu{position:absolute;inset:0;display:none;align-items:center;justify-content:center;' +
+          'background:rgba(0,0,0,.7);backdrop-filter:blur(4px)}' +
+        '.usb-option-dialog{background:#161a22;border:2px solid #3a86ff;border-radius:16px;' +
+          'padding:24px;min-width:400px;box-shadow:0 8px 40px rgba(0,0,0,.8)}' +
+        '.usb-option-title{color:#ffc239;font-size:1.5rem;font-weight:600;margin-bottom:20px;text-align:center}' +
+        '.usb-option-item{display:flex;align-items:center;padding:16px 20px;margin:8px 0;' +
+          'background:#0d0f14;border:2px solid #2a3140;border-radius:12px;color:#e6ebf2;cursor:pointer;transition:all .15s}' +
+        '.usb-option-item:hover{background:#1d2430;border-color:#3a86ff}' +
+        '.usb-option-item.usb-option-selected{background:#3a86ff;color:#fff;border-color:#fff}' +
+        '.usb-option-item.usb-option-current{border-color:#ffc239}' +
+        '.usb-option-icon{font-size:1.5rem;margin-right:16px;min-width:32px;text-align:center}' +
+        '.usb-option-name{font-size:1.2rem;font-weight:600;margin-right:12px}' +
+        '.usb-option-desc{flex:1;color:#8a94a6;font-size:0.9rem}' +
+        '.usb-option-check{color:#ffc239;font-size:1.2rem;margin-left:auto}' +
+        '.usb-option-hint{color:#8a94a6;font-size:0.85rem;text-align:center;margin-top:16px;padding-top:16px;border-top:1px solid #2a3140}' +
         '</style>' +
         '<div class="usb-root">' +
           '<div class="usb-player">' +
@@ -796,6 +1173,8 @@
                 '<div class="usb-left-panel"></div>' +
                 '<div class="usb-right-panel"></div>' +
               '</div>' +
+              '<div class="usb-player-view"></div>' +
+              '<div class="usb-option-menu"></div>' +
             '</div>' +
           '</div>' +
         '</div>';
@@ -807,6 +1186,8 @@
       splitViewEl = el.querySelector('.usb-split-view');
       leftPanelEl = el.querySelector('.usb-left-panel');
       rightPanelEl = el.querySelector('.usb-right-panel');
+      playerViewEl = el.querySelector('.usb-player-view');
+      optionMenuEl = el.querySelector('.usb-option-menu');
     },
 
     onShow: function (params) {
@@ -827,6 +1208,7 @@
 
     onHide: function () {
       isVisible = false;
+      stopPlaybackTimer();
       currentView = 'idle';
       currentDeviceId = null;
       folderEntries = [];
@@ -835,6 +1217,12 @@
       activePanel = 'left';
       selectedCategoryIndex = 0;
       scrollRowOffset = 0;
+      currentPlayingFile = null;
+      currentPlayingIndex = -1;
+      playableFiles = [];
+      playbackElapsed = 0;
+      playbackDuration = 0;
+      isPaused = false;
     },
 
     onNav: function (act) {
