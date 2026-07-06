@@ -77,7 +77,7 @@
 
     if (videoExts.indexOf(ext) !== -1) return Math.floor(Math.random() * 180) + 60; // 1-4 min
     if (audioExts.indexOf(ext) !== -1) return Math.floor(Math.random() * 240) + 120; // 2-6 min
-    if (imageExts.indexOf(ext) !== -1) return 5; // 5 sec for photos
+    if (imageExts.indexOf(ext) !== -1) return 5; // 5 sec for photo slideshow
     return 10;
   }
 
@@ -151,6 +151,30 @@
       year: years[Math.floor(Math.random() * years.length)],
       size: sizes[Math.floor(Math.random() * sizes.length)] + ' Kbytes'
     };
+  }
+
+  // Generate different static photo backgrounds based on index
+  // Note: single quotes in SVG must be encoded as %27 to avoid breaking CSS url()
+  function getPhotoBackground(index) {
+    var backgrounds = [
+      // Landscape with sun and hills
+      "data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%27400%27 height=%27300%27%3E%3Crect fill=%27%23263238%27 width=%27400%27 height=%27300%27/%3E%3Ccircle cx=%27320%27 cy=%2780%27 r=%2740%27 fill=%27%23ffc239%27/%3E%3Cpath d=%27M0 220 Q100 160 200 200 T400 180 L400 300 L0 300Z%27 fill=%27%232e7d32%27/%3E%3Cpath d=%27M0 260 Q150 200 300 240 T400 220 L400 300 L0 300Z%27 fill=%27%231b5e20%27/%3E%3C/svg%3E",
+      // Beach sunset
+      "data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%27400%27 height=%27300%27%3E%3Cdefs%3E%3ClinearGradient id=%27sky%27 x1=%270%27 y1=%270%27 x2=%270%27 y2=%271%27%3E%3Cstop offset=%270%25%27 stop-color=%27%23ff6b35%27/%3E%3Cstop offset=%27100%25%27 stop-color=%27%23f7c59f%27/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect fill=%27url(%23sky)%27 width=%27400%27 height=%27200%27/%3E%3Ccircle cx=%27200%27 cy=%27160%27 r=%2750%27 fill=%27%23ff4500%27/%3E%3Crect y=%27200%27 fill=%27%231565c0%27 width=%27400%27 height=%27100%27/%3E%3Cpath d=%27M0 210 Q100 200 200 215 T400 205 L400 230 L0 230Z%27 fill=%27%230d47a1%27 opacity=%27.5%27/%3E%3C/svg%3E",
+      // Mountains with snow
+      "data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%27400%27 height=%27300%27%3E%3Crect fill=%27%2387ceeb%27 width=%27400%27 height=%27300%27/%3E%3Cpath d=%27M0 300 L100 120 L200 300Z%27 fill=%27%23546e7a%27/%3E%3Cpath d=%27M80 300 L200 100 L320 300Z%27 fill=%27%23607d8b%27/%3E%3Cpath d=%27M200 100 L180 140 L220 140Z%27 fill=%27white%27/%3E%3Cpath d=%27M250 300 L350 150 L400 220 L400 300Z%27 fill=%27%23455a64%27/%3E%3Crect y=%27260%27 fill=%27%232e7d32%27 width=%27400%27 height=%2740%27/%3E%3C/svg%3E",
+      // Night sky with stars
+      "data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%27400%27 height=%27300%27%3E%3Crect fill=%27%230a1628%27 width=%27400%27 height=%27300%27/%3E%3Ccircle cx=%2750%27 cy=%2740%27 r=%272%27 fill=%27white%27/%3E%3Ccircle cx=%27120%27 cy=%2780%27 r=%271.5%27 fill=%27white%27/%3E%3Ccircle cx=%27200%27 cy=%2730%27 r=%272%27 fill=%27white%27/%3E%3Ccircle cx=%27280%27 cy=%2770%27 r=%271%27 fill=%27white%27/%3E%3Ccircle cx=%27350%27 cy=%2750%27 r=%272%27 fill=%27white%27/%3E%3Ccircle cx=%2780%27 cy=%27120%27 r=%271%27 fill=%27white%27/%3E%3Ccircle cx=%27320%27 cy=%27100%27 r=%271.5%27 fill=%27white%27/%3E%3Ccircle cx=%27300%27 cy=%27180%27 r=%2725%27 fill=%27%23f5f5dc%27/%3E%3Cpath d=%27M0 250 Q100 230 200 250 T400 240 L400 300 L0 300Z%27 fill=%27%231a237e%27/%3E%3C/svg%3E",
+      // Forest
+      "data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%27400%27 height=%27300%27%3E%3Crect fill=%27%2381d4fa%27 width=%27400%27 height=%27300%27/%3E%3Cpath d=%27M50 300 L80 180 L110 300Z%27 fill=%27%231b5e20%27/%3E%3Cpath d=%27M100 300 L150 150 L200 300Z%27 fill=%27%232e7d32%27/%3E%3Cpath d=%27M180 300 L230 130 L280 300Z%27 fill=%27%231b5e20%27/%3E%3Cpath d=%27M260 300 L300 160 L340 300Z%27 fill=%27%232e7d32%27/%3E%3Cpath d=%27M320 300 L370 140 L400 220 L400 300Z%27 fill=%27%231b5e20%27/%3E%3Crect y=%27270%27 fill=%27%238d6e63%27 width=%27400%27 height=%2730%27/%3E%3C/svg%3E",
+      // City skyline
+      "data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%27400%27 height=%27300%27%3E%3Cdefs%3E%3ClinearGradient id=%27dusk%27 x1=%270%27 y1=%270%27 x2=%270%27 y2=%271%27%3E%3Cstop offset=%270%25%27 stop-color=%27%231a237e%27/%3E%3Cstop offset=%27100%25%27 stop-color=%27%23e91e63%27/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect fill=%27url(%23dusk)%27 width=%27400%27 height=%27300%27/%3E%3Crect x=%2730%27 y=%27180%27 width=%2740%27 height=%27120%27 fill=%27%23212121%27/%3E%3Crect x=%2790%27 y=%27140%27 width=%2750%27 height=%27160%27 fill=%27%23424242%27/%3E%3Crect x=%27160%27 y=%27100%27 width=%2760%27 height=%27200%27 fill=%27%23212121%27/%3E%3Crect x=%27240%27 y=%27160%27 width=%2745%27 height=%27140%27 fill=%27%23424242%27/%3E%3Crect x=%27300%27 y=%27120%27 width=%2755%27 height=%27180%27 fill=%27%23212121%27/%3E%3Crect x=%27370%27 y=%27200%27 width=%2730%27 height=%27100%27 fill=%27%23424242%27/%3E%3C/svg%3E",
+      // Desert with cactus
+      "data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%27400%27 height=%27300%27%3E%3Crect fill=%27%23ffcc80%27 width=%27400%27 height=%27300%27/%3E%3Ccircle cx=%27320%27 cy=%2760%27 r=%2735%27 fill=%27%23fff59d%27/%3E%3Crect y=%27220%27 fill=%27%23d7ccc8%27 width=%27400%27 height=%2780%27/%3E%3Cpath d=%27M150 220 L150 140 L160 140 L160 170 L180 170 L180 160 L190 160 L190 220%27 fill=%27%232e7d32%27/%3E%3Cpath d=%27M140 170 L140 150 L150 150 L150 170%27 fill=%27%232e7d32%27/%3E%3Cellipse cx=%2780%27 cy=%27250%27 rx=%2740%27 ry=%2715%27 fill=%27%23bcaaa4%27/%3E%3Cellipse cx=%27300%27 cy=%27260%27 rx=%2750%27 ry=%2720%27 fill=%27%23a1887f%27/%3E%3C/svg%3E",
+      // Underwater scene
+      "data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%27400%27 height=%27300%27%3E%3Cdefs%3E%3ClinearGradient id=%27water%27 x1=%270%27 y1=%270%27 x2=%270%27 y2=%271%27%3E%3Cstop offset=%270%25%27 stop-color=%27%2300bcd4%27/%3E%3Cstop offset=%27100%25%27 stop-color=%27%23006064%27/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect fill=%27url(%23water)%27 width=%27400%27 height=%27300%27/%3E%3Cellipse cx=%27100%27 cy=%27100%27 r=%278%27 fill=%27rgba(255,255,255,0.3)%27/%3E%3Cellipse cx=%27300%27 cy=%2760%27 r=%275%27 fill=%27rgba(255,255,255,0.3)%27/%3E%3Cellipse cx=%27200%27 cy=%27150%27 r=%276%27 fill=%27rgba(255,255,255,0.3)%27/%3E%3Cpath d=%27M50 280 Q70 250 90 280 Q110 250 130 280 L130 300 L50 300Z%27 fill=%27%23ff7043%27/%3E%3Cpath d=%27M200 270 Q230 230 260 270 Q290 230 320 270 L320 300 L200 300Z%27 fill=%27%23e91e63%27/%3E%3Cellipse cx=%27250%27 cy=%27120%27 rx=%2730%27 ry=%2715%27 fill=%27%23ffeb3b%27/%3E%3Cpath d=%27M280 120 L300 110 L300 130Z%27 fill=%27%23ffeb3b%27/%3E%3C/svg%3E"
+    ];
+    return backgrounds[index % backgrounds.length];
   }
 
   // Categories for USB content
@@ -719,10 +743,24 @@
     var isPhoto = isPhotoFile(currentPlayingFile.name);
     var bgClass = isVideo ? 'usb-bg-video' : (isPhoto ? 'usb-bg-photo' : 'usb-bg-music');
 
+    // Photo playback: dynamic background per photo, no progress bar in HUD
+    // Video/Music: animated background with full HUD
+    var hudCenterHtml = isPhoto ? '' :
+      '<div class="usb-hud-center">' +
+        '<div class="usb-hud-progress">' +
+          '<span class="usb-hud-time">' + formatDuration(playbackElapsed) + '</span>' +
+          '<div class="usb-hud-bar"><div class="usb-hud-fill" style="width:' + progressPercent + '%"></div></div>' +
+          '<span class="usb-hud-time">' + formatDuration(playbackDuration) + '</span>' +
+        '</div>' +
+      '</div>';
+
+    // For photos, use dynamic background based on current index
+    var bgStyle = isPhoto ? 'background:#1a1a1a url("' + getPhotoBackground(currentPlayingIndex) + '") center/cover no-repeat' : '';
+
     playerViewEl.innerHTML =
-      // Fullscreen simulated background
-      '<div class="usb-player-bg ' + bgClass + '">' +
-        '<div class="usb-player-timer">' + timerDisplay + '</div>' +
+      // Fullscreen simulated background (photo uses dynamic image per index)
+      "<div class=\"usb-player-bg " + bgClass + "\"" + (bgStyle ? " style='" + bgStyle + "'" : "") + ">" +
+        (isPhoto ? '' : '<div class="usb-player-timer">' + timerDisplay + '</div>') +
         (isPaused ? '<div class="usb-player-pause-icon">&#10074;&#10074;</div>' : '') +
       '</div>' +
       // Bottom HUD overlay
@@ -731,13 +769,7 @@
           '<span class="usb-hud-status">' + statusIcon + '</span>' +
           '<span class="usb-hud-filename">' + escapeHtml(currentPlayingFile.name) + '</span>' +
         '</div>' +
-        '<div class="usb-hud-center">' +
-          '<div class="usb-hud-progress">' +
-            '<span class="usb-hud-time">' + formatDuration(playbackElapsed) + '</span>' +
-            '<div class="usb-hud-bar"><div class="usb-hud-fill" style="width:' + progressPercent + '%"></div></div>' +
-            '<span class="usb-hud-time">' + formatDuration(playbackDuration) + '</span>' +
-          '</div>' +
-        '</div>' +
+        hudCenterHtml +
         '<div class="usb-hud-right">' +
           '<span class="usb-hud-mode">' + modeInfo.icon + '</span>' +
           '<span class="usb-hud-counter">' + (currentPlayingIndex + 1) + '/' + playableFiles.length + '</span>' +
@@ -1477,7 +1509,7 @@
         // Fullscreen simulated background
         '.usb-player-bg{position:absolute;inset:0;display:flex;align-items:center;justify-content:center}' +
         '.usb-bg-video{background:linear-gradient(135deg,#1a1a2e 0%,#16213e 50%,#0f3460 100%)}' +
-        '.usb-bg-photo{background:linear-gradient(135deg,#2d3436 0%,#636e72 50%,#b2bec3 100%)}' +
+        '.usb-bg-photo{background:#1a1a1a url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'400\' height=\'300\'%3E%3Crect fill=\'%23263238\' width=\'400\' height=\'300\'/%3E%3Ccircle cx=\'320\' cy=\'80\' r=\'40\' fill=\'%23ffc239\'/%3E%3Cpath d=\'M0 220 Q100 160 200 200 T400 180 L400 300 L0 300Z\' fill=\'%232e7d32\'/%3E%3Cpath d=\'M0 260 Q150 200 300 240 T400 220 L400 300 L0 300Z\' fill=\'%231b5e20\'/%3E%3C/svg%3E") center/cover no-repeat}' +
         '.usb-bg-music{background:linear-gradient(135deg,#0d0d0d 0%,#1a1a2e 50%,#2d132c 100%)}' +
         '.usb-player-timer{font-size:12rem;font-weight:200;color:rgba(255,255,255,.15);' +
           'font-family:"Segoe UI Light","Segoe UI",sans-serif;letter-spacing:8px;user-select:none}' +
