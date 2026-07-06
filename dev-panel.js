@@ -16,7 +16,8 @@
 
   // Playback control keys with SVG icons
   var PLAYBACK_KEYS = [
-    { key: 'PLAY', icon: '<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>', title: 'Play/Pause' },
+    { key: 'PLAY', icon: '<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>', title: 'Play (resume when paused)' },
+    { key: 'PAUSE', icon: '<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M6 4h4v16H6zm8 0h4v16h-4z"/></svg>', title: 'Pause (pause when playing)' },
     { key: 'STOP', icon: '<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12"/></svg>', title: 'Stop' },
     { key: 'REW', icon: '<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M11 18V6l-8.5 6 8.5 6zm.5-6l8.5 6V6l-8.5 6z"/></svg>', title: 'Rewind' },
     { key: 'FF', icon: '<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M4 18l8.5-6L4 6v12zm9-12v12l8.5-6L13 6z"/></svg>', title: 'Fast Forward' },

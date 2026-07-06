@@ -1073,7 +1073,21 @@
     if (currentView === 'playing') {
       switch (act) {
         case 'PLAY':
+          // When playing, Play does nothing; when paused, Play resumes
+          if (isPaused) {
+            isPaused = false;
+            renderPlayer();
+          }
+          return true;
+        case 'PAUSE':
+          // When playing, Pause pauses; when paused, Pause does nothing
+          if (!isPaused) {
+            isPaused = true;
+            renderPlayer();
+          }
+          return true;
         case 'OK':
+          // OK always toggles pause state
           togglePause();
           return true;
         case 'STOP':
@@ -1378,4 +1392,75 @@
       }
     }
   });
+
+  // PC keyboard event handling - only active when USB Media Player is visible
+  if (typeof document !== 'undefined') {
+    document.addEventListener('keydown', function (e) {
+      if (!isVisible) return;
+      // Only handle if no overlay is on top (stack is empty)
+      if (Shell.stack.length > 0) return;
+
+      var handled = false;
+      switch (e.key) {
+        case 'ArrowUp':
+          handleNavAction('UP');
+          handled = true;
+          break;
+        case 'ArrowDown':
+          handleNavAction('DOWN');
+          handled = true;
+          break;
+        case 'ArrowLeft':
+          handleNavAction('LEFT');
+          handled = true;
+          break;
+        case 'ArrowRight':
+          handleNavAction('RIGHT');
+          handled = true;
+          break;
+        case 'Enter':
+          // In split view on a playable file: OK + Play (enter player and start)
+          // In playing view: OK toggles pause
+          if (currentView === 'split' && activePanel === 'right' && folderEntries.length > 0) {
+            var entry = folderEntries[selectedFolderIndex];
+            if (!entry.isDirectory && isPlayableFile(entry.name)) {
+              playFile(entry);
+              handled = true;
+              break;
+            }
+          }
+          handleNavAction('OK');
+          handled = true;
+          break;
+        case 'b':
+        case 'B':
+          handleNavAction('BACK');
+          handled = true;
+          break;
+        case 'i':
+        case 'I':
+          handleNavAction('INFO');
+          handled = true;
+          break;
+        case 'o':
+        case 'O':
+          handleNavAction('OPTION');
+          handled = true;
+          break;
+        case 'd':
+        case 'D':
+          // Toggle DEV PANEL visibility
+          var devPanel = document.getElementById('dev-panel');
+          if (devPanel) {
+            devPanel.style.display = devPanel.style.display === 'none' ? 'block' : 'none';
+          }
+          handled = true;
+          break;
+      }
+      if (handled) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+    });
+  }
 })();
