@@ -707,24 +707,42 @@
     if (!playerViewEl || !currentPlayingFile) return;
     var modeInfo = PLAYBACK_MODES.find(function(m) { return m.id === playbackMode; });
     var progressPercent = playbackDuration > 0 ? (playbackElapsed / playbackDuration) * 100 : 0;
-    var statusText = isPaused ? 'Paused' : 'Playing';
     var statusIcon = isPaused ? '&#10074;&#10074;' : '&#9654;';
-    var fileIcon = getFileIcon(currentPlayingFile.name);
+
+    // Format large timer display (MM:SS)
+    var timerMins = Math.floor(playbackElapsed / 60);
+    var timerSecs = playbackElapsed % 60;
+    var timerDisplay = (timerMins < 10 ? '0' : '') + timerMins + ':' + (timerSecs < 10 ? '0' : '') + timerSecs;
+
+    // Determine if video/photo/music for background style
+    var isVideo = isVideoFile(currentPlayingFile.name);
+    var isPhoto = isPhotoFile(currentPlayingFile.name);
+    var bgClass = isVideo ? 'usb-bg-video' : (isPhoto ? 'usb-bg-photo' : 'usb-bg-music');
 
     playerViewEl.innerHTML =
-      '<div class="usb-player-content">' +
-        '<div class="usb-player-icon">' + fileIcon + '</div>' +
-        '<div class="usb-player-info">' +
-          '<div class="usb-player-filename">' + escapeHtml(currentPlayingFile.name) + '</div>' +
-          '<div class="usb-player-status' + (isPaused ? ' usb-paused' : '') + '">' + statusIcon + ' ' + statusText + '</div>' +
-          '<div class="usb-player-progress">' +
-            '<div class="usb-progress-bar"><div class="usb-progress-fill" style="width:' + progressPercent + '%"></div></div>' +
-            '<div class="usb-progress-time"><span>' + formatDuration(playbackElapsed) + '</span><span>' + formatDuration(playbackDuration) + '</span></div>' +
+      // Fullscreen simulated background
+      '<div class="usb-player-bg ' + bgClass + '">' +
+        '<div class="usb-player-timer">' + timerDisplay + '</div>' +
+        (isPaused ? '<div class="usb-player-pause-icon">&#10074;&#10074;</div>' : '') +
+      '</div>' +
+      // Bottom HUD overlay
+      '<div class="usb-player-hud">' +
+        '<div class="usb-hud-left">' +
+          '<span class="usb-hud-status">' + statusIcon + '</span>' +
+          '<span class="usb-hud-filename">' + escapeHtml(currentPlayingFile.name) + '</span>' +
+        '</div>' +
+        '<div class="usb-hud-center">' +
+          '<div class="usb-hud-progress">' +
+            '<span class="usb-hud-time">' + formatDuration(playbackElapsed) + '</span>' +
+            '<div class="usb-hud-bar"><div class="usb-hud-fill" style="width:' + progressPercent + '%"></div></div>' +
+            '<span class="usb-hud-time">' + formatDuration(playbackDuration) + '</span>' +
           '</div>' +
         '</div>' +
-      '</div>' +
-      '<div class="usb-player-mode">' + modeInfo.icon + ' ' + modeInfo.name + '</div>' +
-      '<div class="usb-player-counter">' + (currentPlayingIndex + 1) + ' / ' + playableFiles.length + '</div>';
+        '<div class="usb-hud-right">' +
+          '<span class="usb-hud-mode">' + modeInfo.icon + '</span>' +
+          '<span class="usb-hud-counter">' + (currentPlayingIndex + 1) + '/' + playableFiles.length + '</span>' +
+        '</div>' +
+      '</div>';
   }
 
   function renderOptionMenu() {
@@ -1454,24 +1472,33 @@
           'background:rgba(42,49,64,0.3);border-radius:4px}' +
         '.usb-scrollbar-thumb{position:absolute;width:100%;background:rgba(138,148,166,0.4);' +
           'border-radius:4px;transition:top .15s ease-out}' +
-        // Player view styles - fullscreen playback
-        '.usb-player-view{position:absolute;inset:0;display:none;flex-direction:column;' +
-          'align-items:center;justify-content:center;background:#0a0c10;padding:60px}' +
-        '.usb-player-content{display:flex;flex-direction:column;align-items:center;gap:36px}' +
-        '.usb-player-icon{font-size:12rem;opacity:.8}' +
-        '.usb-player-info{text-align:center}' +
-        '.usb-player-filename{color:#e6ebf2;font-size:2.8rem;font-weight:600;margin-bottom:12px}' +
-        '.usb-player-status{color:#3a86ff;font-size:1.6rem;margin-bottom:28px}' +
-        '.usb-player-status.usb-paused{color:#ffc239}' +
-        '.usb-player-progress{width:800px}' +
-        '.usb-progress-bar{height:8px;background:#2a3140;border-radius:4px;overflow:hidden}' +
-        '.usb-progress-fill{height:100%;background:linear-gradient(90deg,#3a86ff,#ffc239);' +
-          'border-radius:4px;transition:width .3s ease-out}' +
-        '.usb-progress-time{display:flex;justify-content:space-between;color:#8a94a6;font-size:1.2rem;margin-top:12px}' +
-        '.usb-player-mode{position:absolute;top:40px;right:48px;background:#3a86ff;color:#fff;' +
-          'padding:12px 24px;border-radius:24px;font-size:1.3rem}' +
-        '.usb-player-counter{position:absolute;top:40px;left:48px;color:#8a94a6;font-size:1.3rem}' +
-        '.usb-player-hint{position:absolute;bottom:40px;color:#8a94a6;font-size:1.1rem}' +
+        // Player view styles - fullscreen playback with simulated video background
+        '.usb-player-view{position:absolute;inset:0;display:none;flex-direction:column}' +
+        // Fullscreen simulated background
+        '.usb-player-bg{position:absolute;inset:0;display:flex;align-items:center;justify-content:center}' +
+        '.usb-bg-video{background:linear-gradient(135deg,#1a1a2e 0%,#16213e 50%,#0f3460 100%)}' +
+        '.usb-bg-photo{background:linear-gradient(135deg,#2d3436 0%,#636e72 50%,#b2bec3 100%)}' +
+        '.usb-bg-music{background:linear-gradient(135deg,#0d0d0d 0%,#1a1a2e 50%,#2d132c 100%)}' +
+        '.usb-player-timer{font-size:12rem;font-weight:200;color:rgba(255,255,255,.15);' +
+          'font-family:"Segoe UI Light","Segoe UI",sans-serif;letter-spacing:8px;user-select:none}' +
+        '.usb-player-pause-icon{position:absolute;font-size:8rem;color:rgba(255,255,255,.3)}' +
+        // Bottom HUD overlay
+        '.usb-player-hud{position:absolute;bottom:0;left:0;right:0;' +
+          'background:linear-gradient(transparent,rgba(0,0,0,.8));padding:24px 40px 32px;' +
+          'display:flex;align-items:center;gap:24px}' +
+        '.usb-hud-left{display:flex;align-items:center;gap:16px;min-width:280px}' +
+        '.usb-hud-status{font-size:1.6rem;color:#3a86ff}' +
+        '.usb-hud-filename{color:#e6ebf2;font-size:1.4rem;font-weight:500;' +
+          'overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:240px}' +
+        '.usb-hud-center{flex:1;display:flex;justify-content:center}' +
+        '.usb-hud-progress{display:flex;align-items:center;gap:16px;width:100%;max-width:600px}' +
+        '.usb-hud-time{color:#8a94a6;font-size:1.2rem;min-width:50px;text-align:center}' +
+        '.usb-hud-bar{flex:1;height:6px;background:rgba(255,255,255,.2);border-radius:3px;overflow:hidden}' +
+        '.usb-hud-fill{height:100%;background:linear-gradient(90deg,#3a86ff,#ffc239);' +
+          'border-radius:3px;transition:width .3s ease-out}' +
+        '.usb-hud-right{display:flex;align-items:center;gap:16px;min-width:120px;justify-content:flex-end}' +
+        '.usb-hud-mode{font-size:1.4rem;color:#ffc239}' +
+        '.usb-hud-counter{color:#8a94a6;font-size:1.2rem}' +
         // Option menu styles
         '.usb-option-menu{position:absolute;inset:0;display:none;align-items:center;justify-content:center;' +
           'background:rgba(0,0,0,.7);backdrop-filter:blur(4px)}' +
