@@ -32,10 +32,11 @@
   var idleIconEl = null;
   var playerViewEl = null;
   var optionMenuEl = null;
+  var videoInfoEl = null;
 
   var usbDevices = [];
   var selectedDeviceIndex = 0;
-  // 'idle' | 'devices' | 'split' | 'playing' | 'option-menu'
+  // 'idle' | 'devices' | 'split' | 'playing' | 'option-menu' | 'video-info'
   var currentView = 'idle';
   var currentDeviceId = null;
   // 'left' | 'right' - which panel is active
@@ -90,6 +91,38 @@
                         'mp3', 'wav', 'flac', 'aac', 'ogg', 'wma',
                         'jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp', 'svg'];
     return playableExts.indexOf(ext) !== -1;
+  }
+
+  function isVideoFile(filename) {
+    var ext = (filename.split('.').pop() || '').toLowerCase();
+    var videoExts = ['mp4', 'mkv', 'avi', 'mov', 'wmv', 'flv', 'webm'];
+    return videoExts.indexOf(ext) !== -1;
+  }
+
+  function isPhotoFile(filename) {
+    var ext = (filename.split('.').pop() || '').toLowerCase();
+    var photoExts = ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp', 'svg'];
+    return photoExts.indexOf(ext) !== -1;
+  }
+
+  function generateMockFileSize() {
+    var size = (Math.random() * 500 + 1).toFixed(2);
+    return size + ' MB';
+  }
+
+  function generateMockDate() {
+    var day = Math.floor(Math.random() * 28) + 1;
+    var month = Math.floor(Math.random() * 12) + 1;
+    var dayStr = (day < 10 ? '0' : '') + day;
+    var monthStr = (month < 10 ? '0' : '') + month;
+    return dayStr + '/' + monthStr + '/2026';
+  }
+
+  function generateMockDimensions() {
+    var widths = [71, 128, 256, 512, 640, 800, 1024, 1280, 1920, 3840];
+    var heights = [71, 128, 256, 512, 480, 600, 768, 720, 1080, 2160];
+    var idx = Math.floor(Math.random() * widths.length);
+    return widths[idx] + ' x ' + heights[idx];
   }
 
   // Categories for USB content
@@ -367,13 +400,14 @@
   };
 
   function render() {
-    if (!idleEl || !deviceListEl || !splitViewEl || !playerViewEl || !optionMenuEl) return;
+    if (!idleEl || !deviceListEl || !splitViewEl || !playerViewEl || !optionMenuEl || !videoInfoEl) return;
 
     idleEl.style.display = 'none';
     deviceListEl.style.display = 'none';
     splitViewEl.style.display = 'none';
     playerViewEl.style.display = 'none';
     optionMenuEl.style.display = 'none';
+    videoInfoEl.style.display = 'none';
 
     if (currentView === 'idle' || (currentView === 'devices' && usbDevices.length === 0)) {
       idleEl.style.display = 'flex';
@@ -398,6 +432,12 @@
       optionMenuEl.style.display = 'flex';
       renderPlayer();
       renderOptionMenu();
+    } else if (currentView === 'video-info') {
+      splitViewEl.style.display = 'flex';
+      videoInfoEl.style.display = 'flex';
+      renderLeftPanel();
+      renderRightPanel();
+      renderVideoInfo();
     }
   }
 
@@ -580,6 +620,75 @@
     html += '<div class="usb-option-hint">UP/DOWN: Select | OK: Confirm | BACK: Cancel</div>';
     html += '</div>';
     optionMenuEl.innerHTML = html;
+  }
+
+  function renderVideoInfo() {
+    if (!videoInfoEl) return;
+    var entry = folderEntries[selectedFolderIndex];
+    if (!entry) return;
+
+    var cat = CATEGORIES[selectedCategoryIndex];
+    var isPhoto = (cat.id === 'photo');
+    var dateStr = generateMockDate();
+    var html;
+
+    if (isPhoto) {
+      var dimensionsStr = generateMockDimensions();
+      html = '<div class="usb-video-info-dialog">' +
+        '<div class="usb-video-info-title">Picture metadata</div>' +
+        '<div class="usb-video-info-content">' +
+          '<div class="usb-video-info-row"><span class="usb-video-info-label">Title:</span> ' + escapeHtml(entry.name) + '</div>' +
+          '<div class="usb-video-info-row"><span class="usb-video-info-label">Date:</span> ' + dateStr + '</div>' +
+          '<div class="usb-video-info-row"><span class="usb-video-info-label">Size:</span> ' + dimensionsStr + '</div>' +
+        '</div>' +
+        '<button class="usb-video-info-close">Close</button>' +
+      '</div>';
+    } else {
+      var duration = getFileDuration(entry.name);
+      var durationStr = formatDuration(duration);
+      var sizeStr = generateMockFileSize();
+      html = '<div class="usb-video-info-dialog">' +
+        '<div class="usb-video-info-title">Video metadata</div>' +
+        '<div class="usb-video-info-content">' +
+          '<div class="usb-video-info-row"><span class="usb-video-info-label">Title:</span> ' + escapeHtml(entry.name) + '</div>' +
+          '<div class="usb-video-info-row"><span class="usb-video-info-label">Size:</span> ' + sizeStr + '</div>' +
+          '<div class="usb-video-info-row"><span class="usb-video-info-label">Date:</span> ' + dateStr + '</div>' +
+          '<div class="usb-video-info-row"><span class="usb-video-info-label">Duration:</span> ' + durationStr + '</div>' +
+        '</div>' +
+        '<button class="usb-video-info-close">Close</button>' +
+      '</div>';
+    }
+    videoInfoEl.innerHTML = html;
+  }
+
+  function showVideoInfo() {
+    var cat = CATEGORIES[selectedCategoryIndex];
+    if (activePanel !== 'right') return false;
+    if (folderEntries.length === 0) return false;
+
+    var entry = folderEntries[selectedFolderIndex];
+    if (entry.isDirectory) return false;
+
+    // Check if in Videos category with a video file
+    if (cat.id === 'video' && isVideoFile(entry.name)) {
+      currentView = 'video-info';
+      render();
+      return true;
+    }
+
+    // Check if in Photos category with a photo file
+    if (cat.id === 'photo' && isPhotoFile(entry.name)) {
+      currentView = 'video-info';
+      render();
+      return true;
+    }
+
+    return false;
+  }
+
+  function closeVideoInfo() {
+    currentView = 'split';
+    render();
   }
 
   // Playback timer functions
@@ -1020,6 +1129,18 @@
       return false;
     }
 
+    // Handle video-info view
+    if (currentView === 'video-info') {
+      switch (act) {
+        case 'OK':
+        case 'BACK':
+        case 'INFO':
+          closeVideoInfo();
+          return true;
+      }
+      return false;
+    }
+
     // Handle split/devices views
     switch (act) {
       case 'UP':
@@ -1050,6 +1171,9 @@
       case 'OPTION':
         // Option key in split view - could show playback mode preview
         return false;
+      case 'INFO':
+        // Show video info if in Videos category and on a video file
+        return showVideoInfo();
     }
     return false;
   }
@@ -1158,6 +1282,19 @@
         '.usb-option-desc{flex:1;color:#8a94a6;font-size:0.9rem}' +
         '.usb-option-check{color:#ffc239;font-size:1.2rem;margin-left:auto}' +
         '.usb-option-hint{color:#8a94a6;font-size:0.85rem;text-align:center;margin-top:16px;padding-top:16px;border-top:1px solid #2a3140}' +
+        // Video info dialog styles
+        '.usb-video-info{position:absolute;inset:0;display:none;align-items:center;justify-content:center;' +
+          'background:rgba(0,0,0,.7);backdrop-filter:blur(4px)}' +
+        '.usb-video-info-dialog{background:#4a5568;border:2px solid #718096;border-radius:12px;' +
+          'padding:24px 32px;min-width:380px;box-shadow:0 8px 40px rgba(0,0,0,.8)}' +
+        '.usb-video-info-title{color:#e2e8f0;font-size:1.6rem;font-weight:600;margin-bottom:20px}' +
+        '.usb-video-info-content{margin-bottom:24px}' +
+        '.usb-video-info-row{color:#e2e8f0;font-size:1.2rem;margin:8px 0;line-height:1.6}' +
+        '.usb-video-info-label{color:#e2e8f0;font-weight:600}' +
+        '.usb-video-info-close{display:block;width:100%;background:#3182ce;color:#fff;border:none;' +
+          'border-radius:24px;padding:12px 24px;font-size:1.1rem;font-weight:600;cursor:pointer;' +
+          'transition:background .15s}' +
+        '.usb-video-info-close:hover{background:#2b6cb0}' +
         '</style>' +
         '<div class="usb-root">' +
           '<div class="usb-player">' +
@@ -1174,6 +1311,7 @@
               '</div>' +
               '<div class="usb-player-view"></div>' +
               '<div class="usb-option-menu"></div>' +
+              '<div class="usb-video-info"></div>' +
             '</div>' +
           '</div>' +
         '</div>';
@@ -1187,6 +1325,7 @@
       rightPanelEl = el.querySelector('.usb-right-panel');
       playerViewEl = el.querySelector('.usb-player-view');
       optionMenuEl = el.querySelector('.usb-option-menu');
+      videoInfoEl = el.querySelector('.usb-video-info');
     },
 
     onShow: function (params) {

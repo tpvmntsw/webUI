@@ -10,7 +10,7 @@
   if (typeof document === 'undefined') return; // headless: no-op
 
   var NAV_KEYS = ['MENU', 'SOURCE', 'UP', 'DOWN', 'LEFT', 'RIGHT', 'OK', 'BACK',
-                  'VOL+', 'VOL-', 'MUTE', 'DISPLAY', 'OPTION'];
+                  'VOL+', 'VOL-', 'MUTE', 'DISPLAY', 'OPTION', 'INFO'];
   var DIGITS = ['0','1','2','3','4','5','6','7','8','9'];
   var SOURCE_TOKENS = ['HOME', 'HDMI1', 'HDMI2', 'HDMI3', 'USB'];
 
