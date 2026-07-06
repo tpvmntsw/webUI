@@ -478,10 +478,45 @@
     }
   }
 
+  function updateDeviceScrollOffset() {
+    var total = usbDevices.length;
+    if (total <= DEVICE_VISIBLE_COUNT) {
+      deviceScrollOffset = 0;
+      return;
+    }
+
+    var visibleStart = deviceScrollOffset;
+    var visibleEnd = deviceScrollOffset + DEVICE_VISIBLE_COUNT - 1;
+
+    // Keep cursor in the second-to-last position when moving down
+    // Keep cursor in the second position when moving up
+    if (selectedDeviceIndex > visibleEnd) {
+      deviceScrollOffset = selectedDeviceIndex - (DEVICE_VISIBLE_COUNT - 1);
+    } else if (selectedDeviceIndex < visibleStart) {
+      deviceScrollOffset = selectedDeviceIndex;
+    } else if (selectedDeviceIndex === visibleEnd && selectedDeviceIndex < total - 1) {
+      // At bottom visible row and there's more below - scroll to keep cursor at second-to-last
+      deviceScrollOffset = Math.min(selectedDeviceIndex - (DEVICE_VISIBLE_COUNT - 2), total - DEVICE_VISIBLE_COUNT);
+    } else if (selectedDeviceIndex === visibleStart && deviceScrollOffset > 0) {
+      // At top visible row and there's more above - scroll to keep cursor at second position
+      deviceScrollOffset = Math.max(selectedDeviceIndex - 1, 0);
+    }
+
+    // Clamp scroll offset
+    var maxOffset = Math.max(0, total - DEVICE_VISIBLE_COUNT);
+    deviceScrollOffset = Math.max(0, Math.min(deviceScrollOffset, maxOffset));
+  }
+
   function renderDeviceList() {
     if (!deviceListEl) return;
-    var html = '<div class="usb-section-title">USB Devices</div>';
-    for (var i = 0; i < usbDevices.length; i++) {
+    var total = usbDevices.length;
+    var startIdx = deviceScrollOffset;
+    var endIdx = Math.min(startIdx + DEVICE_VISIBLE_COUNT, total);
+
+    var html = '<div class="usb-device-list-wrapper">';
+    html += '<div class="usb-section-title">USB Devices</div>';
+    html += '<div class="usb-device-items">';
+    for (var i = startIdx; i < endIdx; i++) {
       var device = usbDevices[i];
       var cls = 'usb-list-item' + (i === selectedDeviceIndex ? ' usb-selected' : '');
       var displayName = device.label || device.name || ('USB Device ' + (i + 1));
@@ -490,6 +525,19 @@
         '<span class="usb-list-name">' + escapeHtml(displayName) + '</span>' +
         '</div>';
     }
+    html += '</div>';
+
+    // Scrollbar
+    if (total > DEVICE_VISIBLE_COUNT) {
+      var scrollbarHeight = Math.max(30, (DEVICE_VISIBLE_COUNT / total) * 100);
+      var maxScrollOffset = total - DEVICE_VISIBLE_COUNT;
+      var scrollbarTop = maxScrollOffset > 0 ? (deviceScrollOffset / maxScrollOffset) * (100 - scrollbarHeight) : 0;
+      html += '<div class="usb-device-scrollbar-track">' +
+        '<div class="usb-device-scrollbar-thumb" style="height:' + scrollbarHeight + '%;top:' + scrollbarTop + '%"></div>' +
+        '</div>';
+    }
+    html += '</div>';
+
     deviceListEl.innerHTML = html;
   }
 
@@ -514,6 +562,10 @@
   var ITEMS_PER_PAGE = GRID_COLS * GRID_ROWS;
   // Scroll offset for smooth scrolling (row-based)
   var scrollRowOffset = 0;
+
+  // Device list scrolling (max visible items)
+  var DEVICE_VISIBLE_COUNT = 7;
+  var deviceScrollOffset = 0;
 
   function renderRightPanel() {
     if (!rightPanelEl) return;
@@ -905,6 +957,7 @@
   function updateDeviceList(devices) {
     usbDevices = devices || [];
     selectedDeviceIndex = 0;
+    deviceScrollOffset = 0;
 
     if (usbDevices.length === 0) {
       currentView = 'idle';
@@ -931,8 +984,12 @@
   function moveSelectionVertical(dir) {
     if (currentView === 'devices') {
       if (usbDevices.length === 0) return;
-      selectedDeviceIndex = (selectedDeviceIndex + dir + usbDevices.length) % usbDevices.length;
-      renderDeviceList();
+      var newIndex = selectedDeviceIndex + dir;
+      if (newIndex >= 0 && newIndex < usbDevices.length) {
+        selectedDeviceIndex = newIndex;
+        updateDeviceScrollOffset();
+        renderDeviceList();
+      }
     } else if (currentView === 'split') {
       if (activePanel === 'left') {
         var newIndex = selectedCategoryIndex + dir;
@@ -1301,14 +1358,20 @@
           'align-items:center;justify-content:center;color:#8a94a6;gap:20px}' +
         '.usb-idle-icon{font-size:6rem;opacity:.6}' +
         '.usb-idle-text{font-size:1.8rem}' +
-        '.usb-device-list{position:absolute;inset:0;overflow-y:auto;padding:24px;display:none}' +
+        '.usb-device-list{position:absolute;inset:0;overflow:hidden;padding:24px;display:none}' +
+        '.usb-device-list-wrapper{position:relative;height:100%;display:flex;flex-direction:row}' +
+        '.usb-device-items{flex:1;display:flex;flex-direction:column}' +
+        '.usb-device-scrollbar-track{position:absolute;right:4px;top:60px;bottom:16px;width:6px;' +
+          'background:rgba(42,49,64,0.3);border-radius:3px}' +
+        '.usb-device-scrollbar-thumb{position:absolute;width:100%;background:rgba(138,148,166,0.4);' +
+          'border-radius:3px;transition:top .15s ease-out}' +
         '.usb-section-title{color:#8a94a6;font-size:1.2rem;padding:12px 16px;margin-bottom:12px;' +
           'border-bottom:1px solid #2a3140;text-transform:uppercase;letter-spacing:1px}' +
-        '.usb-list-item{display:flex;align-items:center;padding:20px 24px;margin:10px 0;' +
+        '.usb-list-item{display:flex;align-items:center;padding:22px 28px;margin:8px 0;' +
           'background:#161a22;border:2px solid #2a3140;border-radius:14px;color:#e6ebf2;cursor:pointer;transition:all .15s}' +
         '.usb-list-item:hover{background:#1d2430;border-color:#3a86ff}' +
         '.usb-list-item.usb-selected{background:#3a86ff;color:#fff;border-color:#3a86ff}' +
-        '.usb-list-icon{font-size:2.5rem;margin-right:20px;min-width:48px;text-align:center}' +
+        '.usb-list-icon{font-size:2.4rem;margin-right:20px;min-width:48px;text-align:center}' +
         '.usb-list-name{font-size:1.5rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}' +
         '.usb-empty{color:#8a94a6;text-align:center;padding:60px;font-size:1.5rem}' +
         // Split view styles - fullscreen layout (inside .usb-fullscreen)
