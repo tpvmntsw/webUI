@@ -105,6 +105,12 @@
     return photoExts.indexOf(ext) !== -1;
   }
 
+  function isMusicFile(filename) {
+    var ext = (filename.split('.').pop() || '').toLowerCase();
+    var musicExts = ['mp3', 'wav', 'flac', 'aac', 'ogg', 'wma'];
+    return musicExts.indexOf(ext) !== -1;
+  }
+
   function generateMockFileSize() {
     var size = (Math.random() * 500 + 1).toFixed(2);
     return size + ' MB';
@@ -123,6 +129,26 @@
     var heights = [71, 128, 256, 512, 480, 600, 768, 720, 1080, 2160];
     var idx = Math.floor(Math.random() * widths.length);
     return widths[idx] + ' x ' + heights[idx];
+  }
+
+  function generateMockMusicInfo() {
+    var albums = ['Japanese', 'Greatest Hits', 'Summer Collection', 'Classical', 'Jazz Masters', 'Rock Anthems'];
+    var titles = ['Sakura', 'Moonlight', 'Summer Breeze', 'Symphony No.5', 'Blue Moon', 'Highway Star'];
+    var artists = ['Artist One', 'The Band', 'Jazz Trio', 'Orchestra', 'Rock Legend', 'Pop Star'];
+    var bitRates = ['128K', '192K', '256K', '320K'];
+    var samplings = ['44K', '44.1K', '48K', '96K'];
+    var years = [2018, 2019, 2020, 2021, 2022, 2023, 2024, 2025, 2026];
+    var sizes = [2048, 3500, 4096, 5120, 6500, 8192, 9395, 10240];
+
+    return {
+      album: albums[Math.floor(Math.random() * albums.length)],
+      title: titles[Math.floor(Math.random() * titles.length)],
+      bitRate: bitRates[Math.floor(Math.random() * bitRates.length)],
+      artist: artists[Math.floor(Math.random() * artists.length)],
+      sampling: samplings[Math.floor(Math.random() * samplings.length)],
+      year: years[Math.floor(Math.random() * years.length)],
+      size: sizes[Math.floor(Math.random() * sizes.length)] + ' Kbytes'
+    };
   }
 
   // Categories for USB content
@@ -629,6 +655,7 @@
 
     var cat = CATEGORIES[selectedCategoryIndex];
     var isPhoto = (cat.id === 'photo');
+    var isMusic = (cat.id === 'music');
     var dateStr = generateMockDate();
     var html;
 
@@ -640,6 +667,21 @@
           '<div class="usb-video-info-row"><span class="usb-video-info-label">Title:</span> ' + escapeHtml(entry.name) + '</div>' +
           '<div class="usb-video-info-row"><span class="usb-video-info-label">Date:</span> ' + dateStr + '</div>' +
           '<div class="usb-video-info-row"><span class="usb-video-info-label">Size:</span> ' + dimensionsStr + '</div>' +
+        '</div>' +
+        '<button class="usb-video-info-close">Close</button>' +
+      '</div>';
+    } else if (isMusic) {
+      var musicInfo = generateMockMusicInfo();
+      html = '<div class="usb-video-info-dialog">' +
+        '<div class="usb-video-info-title">Music metadata</div>' +
+        '<div class="usb-video-info-content">' +
+          '<div class="usb-video-info-row"><span class="usb-video-info-label">Album:</span> ' + escapeHtml(musicInfo.album) + '</div>' +
+          '<div class="usb-video-info-row"><span class="usb-video-info-label">Title:</span> ' + escapeHtml(musicInfo.title) + '</div>' +
+          '<div class="usb-video-info-row"><span class="usb-video-info-label">Bit Rate :</span> ' + musicInfo.bitRate + '</div>' +
+          '<div class="usb-video-info-row"><span class="usb-video-info-label">Artist:</span> ' + escapeHtml(musicInfo.artist) + '</div>' +
+          '<div class="usb-video-info-row"><span class="usb-video-info-label">Sampling :</span> ' + musicInfo.sampling + '</div>' +
+          '<div class="usb-video-info-row"><span class="usb-video-info-label">Year:</span> ' + musicInfo.year + '</div>' +
+          '<div class="usb-video-info-row"><span class="usb-video-info-label">Size:</span> ' + musicInfo.size + '</div>' +
         '</div>' +
         '<button class="usb-video-info-close">Close</button>' +
       '</div>';
@@ -678,6 +720,13 @@
 
     // Check if in Photos category with a photo file
     if (cat.id === 'photo' && isPhotoFile(entry.name)) {
+      currentView = 'video-info';
+      render();
+      return true;
+    }
+
+    // Check if in Music category with a music file
+    if (cat.id === 'music' && isMusicFile(entry.name)) {
       currentView = 'video-info';
       render();
       return true;
