@@ -38,7 +38,7 @@
 
   var usbDevices = [];
   var selectedDeviceIndex = 0;
-  // 'idle' | 'devices' | 'split' | 'playing' | 'option-menu' | 'video-info'
+  // 'idle' | 'devices' | 'split' | 'playing' | 'option-menu' | 'video-info' | 'music-options' | 'music-repeat-submenu'
   var currentView = 'idle';
   var currentDeviceId = null;
   // 'left' | 'right' - which panel is active
@@ -59,6 +59,15 @@
   var selectedModeIndex = 2;
   var playableFiles = []; // filtered list of playable files in current folder
   var currentPlayingIndex = -1;
+
+  // Music Options state
+  var musicOptionsEl = null;
+  var musicRepeatSubmenuEl = null;
+  var musicOptionsIndex = 0;
+  var musicShuffleOn = false;
+  var musicRepeatMode = 'play-once'; // 'play-once' | 'repeat'
+  var musicRepeatSubmenuIndex = 0;
+  var musicOptionsFromLeftPanel = false;
 
   // Playback modes
   var PLAYBACK_MODES = [
@@ -453,7 +462,7 @@
   };
 
   function render() {
-    if (!idleEl || !deviceListEl || !splitViewEl || !playerViewEl || !optionMenuEl || !videoInfoEl || !fullscreenEl || !windowEl) return;
+    if (!idleEl || !deviceListEl || !splitViewEl || !playerViewEl || !optionMenuEl || !videoInfoEl || !fullscreenEl || !windowEl || !musicOptionsEl || !musicRepeatSubmenuEl) return;
 
     // Hide all views
     idleEl.style.display = 'none';
@@ -462,10 +471,13 @@
     playerViewEl.style.display = 'none';
     optionMenuEl.style.display = 'none';
     videoInfoEl.style.display = 'none';
+    musicOptionsEl.style.display = 'none';
+    musicRepeatSubmenuEl.style.display = 'none';
 
-    // Determine if we're in fullscreen mode (split/playing/option-menu/video-info)
+    // Determine if we're in fullscreen mode (split/playing/option-menu/video-info/music-options/music-repeat-submenu)
     var isFullscreenView = (currentView === 'split' || currentView === 'playing' ||
-                            currentView === 'option-menu' || currentView === 'video-info');
+                            currentView === 'option-menu' || currentView === 'video-info' ||
+                            currentView === 'music-options' || currentView === 'music-repeat-submenu');
 
     // Toggle between windowed (idle/devices) and fullscreen (split/playing) containers
     windowEl.style.display = isFullscreenView ? 'none' : 'flex';
@@ -508,6 +520,18 @@
       renderLeftPanel();
       renderRightPanel();
       renderVideoInfo();
+    } else if (currentView === 'music-options') {
+      splitViewEl.style.display = 'flex';
+      musicOptionsEl.style.display = 'flex';
+      renderLeftPanel();
+      renderRightPanel();
+      renderMusicOptions();
+    } else if (currentView === 'music-repeat-submenu') {
+      splitViewEl.style.display = 'flex';
+      musicRepeatSubmenuEl.style.display = 'flex';
+      renderLeftPanel();
+      renderRightPanel();
+      renderMusicRepeatSubmenu();
     }
   }
 
@@ -962,6 +986,136 @@
       '</div>';
     }
     videoInfoEl.innerHTML = html;
+  }
+
+  function renderMusicOptions() {
+    if (!musicOptionsEl) return;
+
+    var shuffleToggle = musicShuffleOn ?
+      '<span class="music-opt-toggle music-opt-toggle-on"></span>' :
+      '<span class="music-opt-toggle music-opt-toggle-off"></span>';
+
+    var html = '<div class="music-opt-dialog">' +
+      '<div class="music-opt-header">' +
+        '<span class="music-opt-title">Options</span>' +
+      '</div>' +
+      '<div class="music-opt-list">';
+
+    if (!musicOptionsFromLeftPanel) {
+      var playAllCls = 'music-opt-item' + (musicOptionsIndex === 0 ? ' music-opt-item-selected' : '');
+      html += '<div class="' + playAllCls + '" data-index="0">' +
+        '<span class="music-opt-name">Play All</span>' +
+      '</div>';
+    }
+
+    var shuffleIdx = musicOptionsFromLeftPanel ? 0 : 1;
+    var repeatIdx = musicOptionsFromLeftPanel ? 1 : 2;
+
+    var shuffleCls = 'music-opt-item' + (musicOptionsIndex === shuffleIdx ? ' music-opt-item-selected' : '');
+    html += '<div class="' + shuffleCls + '" data-index="' + shuffleIdx + '">' +
+      '<span class="music-opt-name">Shuffle</span>' +
+      shuffleToggle +
+    '</div>';
+
+    var repeatCls = 'music-opt-item' + (musicOptionsIndex === repeatIdx ? ' music-opt-item-selected' : '');
+    html += '<div class="' + repeatCls + '" data-index="' + repeatIdx + '">' +
+      '<span class="music-opt-name">Repeat</span>' +
+      '<span class="music-opt-arrow">&#10095;</span>' +
+    '</div>';
+
+    html += '</div></div>';
+
+    musicOptionsEl.innerHTML = html;
+  }
+
+  function renderMusicRepeatSubmenu() {
+    if (!musicRepeatSubmenuEl) return;
+
+    var playOnceCls = 'music-repeat-item' + (musicRepeatSubmenuIndex === 0 ? ' music-repeat-item-selected' : '');
+    var repeatCls = 'music-repeat-item' + (musicRepeatSubmenuIndex === 1 ? ' music-repeat-item-selected' : '');
+
+    var playOnceCheck = (musicRepeatMode === 'play-once') ? '<span class="music-repeat-check">&#10003;</span>' : '';
+    var repeatCheck = (musicRepeatMode === 'repeat') ? '<span class="music-repeat-check">&#10003;</span>' : '';
+
+    var html = '<div class="music-repeat-dialog">' +
+      '<div class="music-repeat-header">' +
+        '<span class="music-repeat-title">Options / Repeat</span>' +
+      '</div>' +
+      '<div class="music-repeat-list">' +
+        '<div class="' + playOnceCls + '" data-index="0">' +
+          '<span class="music-repeat-name">Play Once</span>' +
+          playOnceCheck +
+        '</div>' +
+        '<div class="' + repeatCls + '" data-index="1">' +
+          '<span class="music-repeat-name">Repeat</span>' +
+          repeatCheck +
+        '</div>' +
+      '</div>' +
+    '</div>';
+
+    musicRepeatSubmenuEl.innerHTML = html;
+  }
+
+  function openMusicOptions(fromLeftPanel) {
+    var cat = CATEGORIES[selectedCategoryIndex];
+    if (cat.id !== 'music') return false;
+
+    musicOptionsFromLeftPanel = fromLeftPanel;
+    musicOptionsIndex = 0;
+    currentView = 'music-options';
+    render();
+    return true;
+  }
+
+  function closeMusicOptions() {
+    currentView = 'split';
+    render();
+  }
+
+  function openMusicRepeatSubmenu() {
+    musicRepeatSubmenuIndex = (musicRepeatMode === 'play-once') ? 0 : 1;
+    currentView = 'music-repeat-submenu';
+    render();
+  }
+
+  function closeMusicRepeatSubmenu() {
+    currentView = 'music-options';
+    render();
+  }
+
+  function confirmMusicRepeat() {
+    musicRepeatMode = (musicRepeatSubmenuIndex === 0) ? 'play-once' : 'repeat';
+    renderMusicRepeatSubmenu();
+  }
+
+  function handleMusicOptionsOK() {
+    var playAllIdx = musicOptionsFromLeftPanel ? -1 : 0;
+    var shuffleIdx = musicOptionsFromLeftPanel ? 0 : 1;
+    var repeatIdx = musicOptionsFromLeftPanel ? 1 : 2;
+
+    if (musicOptionsIndex === playAllIdx) {
+      closeMusicOptions();
+      playAllMusic();
+    } else if (musicOptionsIndex === shuffleIdx) {
+      musicShuffleOn = !musicShuffleOn;
+      renderMusicOptions();
+    } else if (musicOptionsIndex === repeatIdx) {
+      openMusicRepeatSubmenu();
+    }
+  }
+
+  function playAllMusic() {
+    buildPlayableList();
+    if (playableFiles.length === 0) return;
+
+    if (musicShuffleOn) {
+      playbackMode = 'shuffle';
+      var startIndex = Math.floor(Math.random() * playableFiles.length);
+      playFileAtIndex(startIndex);
+    } else {
+      playbackMode = (musicRepeatMode === 'repeat') ? 'repeat-all' : 'single';
+      playFileAtIndex(0);
+    }
   }
 
   function showVideoInfo() {
@@ -1577,6 +1731,65 @@
       return false;
     }
 
+    // Handle music-options view
+    if (currentView === 'music-options') {
+      var maxIdx = musicOptionsFromLeftPanel ? 1 : 2;
+      var repeatIdx = musicOptionsFromLeftPanel ? 1 : 2;
+      switch (act) {
+        case 'UP':
+          if (musicOptionsIndex > 0) {
+            musicOptionsIndex--;
+            renderMusicOptions();
+          }
+          return true;
+        case 'DOWN':
+          if (musicOptionsIndex < maxIdx) {
+            musicOptionsIndex++;
+            renderMusicOptions();
+          }
+          return true;
+        case 'OK':
+          handleMusicOptionsOK();
+          return true;
+        case 'RIGHT':
+          if (musicOptionsIndex === repeatIdx) {
+            openMusicRepeatSubmenu();
+          }
+          return true;
+        case 'BACK':
+        case 'OPTION':
+          closeMusicOptions();
+          return true;
+      }
+      return false;
+    }
+
+    // Handle music-repeat-submenu view
+    if (currentView === 'music-repeat-submenu') {
+      switch (act) {
+        case 'UP':
+          if (musicRepeatSubmenuIndex > 0) {
+            musicRepeatSubmenuIndex--;
+            renderMusicRepeatSubmenu();
+          }
+          return true;
+        case 'DOWN':
+          if (musicRepeatSubmenuIndex < 1) {
+            musicRepeatSubmenuIndex++;
+            renderMusicRepeatSubmenu();
+          }
+          return true;
+        case 'OK':
+          confirmMusicRepeat();
+          return true;
+        case 'LEFT':
+        case 'BACK':
+          closeMusicRepeatSubmenu();
+          return true;
+      }
+      return false;
+    }
+
     // Handle split/devices views
     switch (act) {
       case 'UP':
@@ -1605,7 +1818,17 @@
         }
         return false;
       case 'OPTION':
-        // Option key in split view - could show playback mode preview
+        // Option key in Music category opens music options
+        if (isMusicCategory()) {
+          if (activePanel === 'left') {
+            return openMusicOptions(true);
+          } else if (activePanel === 'right' && folderEntries.length > 0) {
+            var entry = folderEntries[selectedFolderIndex];
+            if (!entry.isDirectory && isMusicFile(entry.name)) {
+              return openMusicOptions(false);
+            }
+          }
+        }
         return false;
       case 'INFO':
         // Show video info if in Videos category and on a video file
@@ -1781,6 +2004,45 @@
         '.usb-video-info-close:hover{background:#2b6cb0}' +
         // Fullscreen views (split/playing) - positioned outside usb-player window
         '.usb-fullscreen{position:absolute;inset:0;display:none;background:#0d0f14}' +
+        // Music Options dialog styles (matching Music header style)
+        '.music-options{position:absolute;inset:0;display:none;align-items:flex-start;justify-content:flex-start;' +
+          'background:transparent;padding-top:80px;padding-left:60px}' +
+        '.music-opt-dialog{background:#3a4556;border-radius:8px;min-width:420px;' +
+          'box-shadow:0 8px 40px rgba(0,0,0,.6);overflow:hidden}' +
+        '.music-opt-header{padding:20px 28px;background:#11151c;border-bottom:1px solid #2a3140}' +
+        '.music-opt-title{font-size:1.6rem;font-weight:600;color:#ffc239;letter-spacing:.5px}' +
+        '.music-opt-list{padding:8px 0;background:#0d0f14}' +
+        '.music-opt-item{display:flex;align-items:center;padding:18px 28px;color:#e6ebf2;' +
+          'cursor:pointer;transition:all .15s}' +
+        '.music-opt-item:hover{background:#1d2430}' +
+        '.music-opt-item.music-opt-item-selected{background:#3a86ff;color:#fff}' +
+        '.music-opt-name{flex:1;font-size:1.4rem;font-weight:500}' +
+        '.music-opt-arrow{font-size:1.2rem;color:#8a94a6}' +
+        '.music-opt-item.music-opt-item-selected .music-opt-arrow{color:#fff}' +
+        // Toggle switch styles
+        '.music-opt-toggle{display:inline-block;width:52px;height:28px;border-radius:14px;position:relative;' +
+          'transition:background .2s}' +
+        '.music-opt-toggle::after{content:"";position:absolute;top:3px;width:22px;height:22px;' +
+          'border-radius:50%;background:#fff;transition:left .2s}' +
+        '.music-opt-toggle-off{background:#718096}' +
+        '.music-opt-toggle-off::after{left:3px}' +
+        '.music-opt-toggle-on{background:#3a86ff}' +
+        '.music-opt-toggle-on::after{left:27px}' +
+        // Music Repeat submenu dialog styles (matching Music header style)
+        '.music-repeat-submenu{position:absolute;inset:0;display:none;align-items:flex-start;justify-content:flex-start;' +
+          'background:transparent;padding-top:80px;padding-left:60px}' +
+        '.music-repeat-dialog{background:#0d0f14;border-radius:8px;min-width:420px;' +
+          'box-shadow:0 8px 40px rgba(0,0,0,.6);overflow:hidden}' +
+        '.music-repeat-header{padding:20px 28px;background:#11151c;border-bottom:1px solid #2a3140}' +
+        '.music-repeat-title{font-size:1.6rem;font-weight:600;color:#ffc239;letter-spacing:.5px}' +
+        '.music-repeat-list{padding:8px 0}' +
+        '.music-repeat-item{display:flex;align-items:center;padding:18px 28px;color:#e6ebf2;' +
+          'cursor:pointer;transition:all .15s}' +
+        '.music-repeat-item:hover{background:#1d2430}' +
+        '.music-repeat-item.music-repeat-item-selected{background:#3a86ff;color:#fff}' +
+        '.music-repeat-name{flex:1;font-size:1.4rem;font-weight:500}' +
+        '.music-repeat-check{font-size:1.4rem;color:#ffc239}' +
+        '.music-repeat-item.music-repeat-item-selected .music-repeat-check{color:#fff}' +
         '</style>' +
         '<div class="usb-root">' +
           '<div class="usb-player">' +
@@ -1801,6 +2063,8 @@
             '<div class="usb-player-view"></div>' +
             '<div class="usb-option-menu"></div>' +
             '<div class="usb-video-info"></div>' +
+            '<div class="music-options"></div>' +
+            '<div class="music-repeat-submenu"></div>' +
           '</div>' +
         '</div>';
       stageEl = el.querySelector('.usb-stage');
@@ -1816,6 +2080,8 @@
       playerViewEl = el.querySelector('.usb-player-view');
       optionMenuEl = el.querySelector('.usb-option-menu');
       videoInfoEl = el.querySelector('.usb-video-info');
+      musicOptionsEl = el.querySelector('.music-options');
+      musicRepeatSubmenuEl = el.querySelector('.music-repeat-submenu');
     },
 
     onShow: function (params) {
