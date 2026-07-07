@@ -38,8 +38,9 @@
 
   var usbDevices = [];
   var selectedDeviceIndex = 0;
-  // 'idle' | 'devices' | 'split' | 'playing' | 'option-menu' | 'video-info' | 'music-options' | 'music-repeat-submenu'
+  // 'idle' | 'devices' | 'split' | 'playing' | 'option-menu' | 'video-info' | 'music-options' | 'music-repeat-submenu' | 'music-player'
   var currentView = 'idle';
+  var musicPlayerEl = null;
   var currentDeviceId = null;
   // 'left' | 'right' - which panel is active
   var activePanel = 'left';
@@ -68,6 +69,17 @@
   var musicRepeatMode = 'play-once'; // 'play-once' | 'repeat'
   var musicRepeatSubmenuIndex = 0;
   var musicOptionsFromLeftPanel = false;
+
+  // Music Player state
+  var musicPlayerControlIndex = 0; // 0-7: play/pause, rewind, ff, prev, next, playall, shuffle, repeat
+  var musicPlayerPlayAllOn = false;
+  var musicPlayerShuffleOn = false;
+  var musicPlayerRepeatOn = false; // false = play once, true = repeat
+  var musicPlayerFastMode = null; // null | 'rewind' | 'forward'
+  var musicPlayerFastSpeed = 0; // 0=x2, 1=x4, 2=x8, 3=x16, 4=x32
+  var musicPlayerReturnToIndex = 0; // index in folderEntries to return to after BACK
+  var musicPlayerFromPlayAll = false; // true if entered via Play all option
+  var musicPlayerPlayedIndices = []; // tracks which songs have been played in Play all mode
 
   // Playback modes
   var PLAYBACK_MODES = [
@@ -462,7 +474,7 @@
   };
 
   function render() {
-    if (!idleEl || !deviceListEl || !splitViewEl || !playerViewEl || !optionMenuEl || !videoInfoEl || !fullscreenEl || !windowEl || !musicOptionsEl || !musicRepeatSubmenuEl) return;
+    if (!idleEl || !deviceListEl || !splitViewEl || !playerViewEl || !optionMenuEl || !videoInfoEl || !fullscreenEl || !windowEl || !musicOptionsEl || !musicRepeatSubmenuEl || !musicPlayerEl) return;
 
     // Hide all views
     idleEl.style.display = 'none';
@@ -473,11 +485,13 @@
     videoInfoEl.style.display = 'none';
     musicOptionsEl.style.display = 'none';
     musicRepeatSubmenuEl.style.display = 'none';
+    musicPlayerEl.style.display = 'none';
 
-    // Determine if we're in fullscreen mode (split/playing/option-menu/video-info/music-options/music-repeat-submenu)
+    // Determine if we're in fullscreen mode (split/playing/option-menu/video-info/music-options/music-repeat-submenu/music-player)
     var isFullscreenView = (currentView === 'split' || currentView === 'playing' ||
                             currentView === 'option-menu' || currentView === 'video-info' ||
-                            currentView === 'music-options' || currentView === 'music-repeat-submenu');
+                            currentView === 'music-options' || currentView === 'music-repeat-submenu' ||
+                            currentView === 'music-player');
 
     // Toggle between windowed (idle/devices) and fullscreen (split/playing) containers
     windowEl.style.display = isFullscreenView ? 'none' : 'flex';
@@ -532,6 +546,9 @@
       renderLeftPanel();
       renderRightPanel();
       renderMusicRepeatSubmenu();
+    } else if (currentView === 'music-player') {
+      musicPlayerEl.style.display = 'flex';
+      renderMusicPlayer();
     }
   }
 
@@ -1004,7 +1021,7 @@
     if (!musicOptionsFromLeftPanel) {
       var playAllCls = 'music-opt-item' + (musicOptionsIndex === 0 ? ' music-opt-item-selected' : '');
       html += '<div class="' + playAllCls + '" data-index="0">' +
-        '<span class="music-opt-name">Play All</span>' +
+        '<span class="music-opt-name">Play all</span>' +
       '</div>';
     }
 
@@ -1088,6 +1105,469 @@
     renderMusicRepeatSubmenu();
   }
 
+  // Music Player SVG icons - clean, universally recognizable (80x80 size)
+  function getMusicPlayerIcon(type, isHighlight) {
+    var color = isHighlight ? '#fff' : '#8a94a6';
+    switch (type) {
+      case 'play':
+        return '<svg viewBox="0 0 40 40" width="80" height="80"><polygon points="12,8 32,20 12,32" fill="' + color + '"/></svg>';
+      case 'pause':
+        return '<svg viewBox="0 0 40 40" width="80" height="80"><rect x="10" y="8" width="7" height="24" fill="' + color + '"/><rect x="23" y="8" width="7" height="24" fill="' + color + '"/></svg>';
+      case 'rewind':
+        return '<svg viewBox="0 0 40 40" width="80" height="80"><polygon points="20,8 20,32 4,20" fill="' + color + '"/><polygon points="36,8 36,32 20,20" fill="' + color + '"/></svg>';
+      case 'forward':
+        return '<svg viewBox="0 0 40 40" width="80" height="80"><polygon points="4,8 20,20 4,32" fill="' + color + '"/><polygon points="20,8 36,20 20,32" fill="' + color + '"/></svg>';
+      case 'prev':
+        return '<svg viewBox="0 0 40 40" width="80" height="80"><rect x="6" y="8" width="4" height="24" fill="' + color + '"/><polygon points="34,8 34,32 14,20" fill="' + color + '"/></svg>';
+      case 'next':
+        return '<svg viewBox="0 0 40 40" width="80" height="80"><polygon points="6,8 26,20 6,32" fill="' + color + '"/><rect x="30" y="8" width="4" height="24" fill="' + color + '"/></svg>';
+      case 'playall':
+        return '<svg viewBox="0 0 40 40" width="80" height="80"><circle cx="20" cy="20" r="14" fill="none" stroke="' + color + '" stroke-width="3"/><polygon points="16,12 16,28 28,20" fill="' + color + '"/></svg>';
+      case 'shuffle':
+        return '<svg viewBox="0 0 40 40" width="80" height="80"><path d="M6,12 L20,12 L26,28 L34,28 M6,28 L20,28 L26,12 L34,12" fill="none" stroke="' + color + '" stroke-width="3" stroke-linecap="round"/><polyline points="30,8 34,12 30,16" fill="none" stroke="' + color + '" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/><polyline points="30,24 34,28 30,32" fill="none" stroke="' + color + '" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+      case 'repeat':
+        return '<svg viewBox="0 0 40 40" width="80" height="80"><path d="M8,14 L8,26 Q8,30 12,30 L28,30 Q32,30 32,26 L32,14 Q32,10 28,10 L12,10" fill="none" stroke="' + color + '" stroke-width="3" stroke-linecap="round"/><polyline points="16,6 12,10 16,14" fill="none" stroke="' + color + '" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+      default:
+        return '';
+    }
+  }
+
+  // Cache for music file metadata (so it doesn't regenerate on every render)
+  var musicFileMetaCache = {};
+
+  function getMusicFileInfo(entry) {
+    // Use cached metadata if available
+    if (musicFileMetaCache[entry.name]) {
+      return musicFileMetaCache[entry.name];
+    }
+    // Generate and cache metadata for this file
+    var info = generateMockMusicInfo();
+    var fileInfo = {
+      filename: entry.name,
+      artist: info.artist,
+      album: info.album,
+      genre: 'Electronic'
+    };
+    musicFileMetaCache[entry.name] = fileInfo;
+    return fileInfo;
+  }
+
+  function renderMusicPlayer() {
+    if (!musicPlayerEl || !currentPlayingFile) return;
+
+    var fileInfo = getMusicFileInfo(currentPlayingFile);
+    var progressPercent = playbackDuration > 0 ? (playbackElapsed / playbackDuration) * 100 : 0;
+
+    // Format time display (00:00:00 format)
+    function formatTimeHMS(seconds) {
+      var hrs = Math.floor(seconds / 3600);
+      var mins = Math.floor((seconds % 3600) / 60);
+      var secs = seconds % 60;
+      return (hrs < 10 ? '0' : '') + hrs + ':' + (mins < 10 ? '0' : '') + mins + ':' + (secs < 10 ? '0' : '') + secs;
+    }
+
+    // Build metadata line (Artist | Album | Genre)
+    var metaParts = [];
+    if (fileInfo.artist) metaParts.push(escapeHtml(fileInfo.artist));
+    if (fileInfo.album) metaParts.push(escapeHtml(fileInfo.album));
+    if (fileInfo.genre) metaParts.push(escapeHtml(fileInfo.genre));
+    var metaLine = metaParts.join(' | ');
+
+    // Determine play/pause icon state
+    var playPauseIcon = isPaused ? getMusicPlayerIcon('play', true) : getMusicPlayerIcon('pause', true);
+
+    // Fast mode display
+    var rewindContent, forwardContent;
+    if (musicPlayerFastMode === 'rewind') {
+      var speeds = ['x2', 'x4', 'x8', 'x16', 'x32'];
+      rewindContent = '<span class="mp-fast-speed">' + speeds[musicPlayerFastSpeed] + '</span>';
+    } else {
+      rewindContent = getMusicPlayerIcon('rewind', true);
+    }
+    if (musicPlayerFastMode === 'forward') {
+      var speeds = ['x2', 'x4', 'x8', 'x16', 'x32'];
+      forwardContent = '<span class="mp-fast-speed">' + speeds[musicPlayerFastSpeed] + '</span>';
+    } else {
+      forwardContent = getMusicPlayerIcon('forward', true);
+    }
+
+    // Build control icons with selection highlight
+    var controls = [
+      { id: 'playpause', content: playPauseIcon, highlight: true },
+      { id: 'rewind', content: rewindContent, highlight: true },
+      { id: 'forward', content: forwardContent, highlight: true },
+      { id: 'prev', content: getMusicPlayerIcon('prev', true), highlight: true },
+      { id: 'next', content: getMusicPlayerIcon('next', true), highlight: true },
+      { id: 'playall', content: getMusicPlayerIcon('playall', musicPlayerPlayAllOn), highlight: musicPlayerPlayAllOn },
+      { id: 'shuffle', content: getMusicPlayerIcon('shuffle', musicPlayerShuffleOn), highlight: musicPlayerShuffleOn },
+      { id: 'repeat', content: getMusicPlayerIcon('repeat', musicPlayerRepeatOn), highlight: musicPlayerRepeatOn }
+    ];
+
+    var controlsHtml = '';
+    for (var i = 0; i < controls.length; i++) {
+      var ctrl = controls[i];
+      var isSelected = (musicPlayerControlIndex === i);
+      var cls = 'mp-ctrl-btn' + (isSelected ? ' mp-ctrl-selected' : '') + (ctrl.highlight ? ' mp-ctrl-on' : ' mp-ctrl-off');
+      controlsHtml += '<div class="' + cls + '" data-index="' + i + '">' + ctrl.content + '</div>';
+    }
+
+    // Large timer display in background
+    var timerMins = Math.floor(playbackElapsed / 60);
+    var timerSecs = playbackElapsed % 60;
+    var timerDisplay = (timerMins < 10 ? '0' : '') + timerMins + ':' + (timerSecs < 10 ? '0' : '') + timerSecs;
+
+    musicPlayerEl.innerHTML =
+      '<div class="mp-bg">' +
+        '<div class="mp-timer">' + timerDisplay + '</div>' +
+      '</div>' +
+      '<div class="mp-hud">' +
+        '<div class="mp-art">' +
+          '<svg viewBox="0 0 180 180" width="180" height="180" xmlns="http://www.w3.org/2000/svg">' +
+            '<rect width="180" height="180" fill="#4a5568" rx="8"/>' +
+            '<text x="90" y="115" text-anchor="middle" font-size="90" fill="#fff">&#9835;</text>' +
+          '</svg>' +
+        '</div>' +
+        '<div class="mp-info">' +
+          '<div class="mp-filename">' + escapeHtml(fileInfo.filename) + '</div>' +
+          '<div class="mp-meta">' + metaLine + '</div>' +
+          '<div class="mp-progress">' +
+            '<div class="mp-progress-bar">' +
+              '<div class="mp-progress-fill" style="width:' + progressPercent + '%"></div>' +
+            '</div>' +
+            '<div class="mp-time">' +
+              '<span>' + formatTimeHMS(playbackElapsed) + '</span>' +
+              '<span> / </span>' +
+              '<span>' + formatTimeHMS(playbackDuration) + '</span>' +
+            '</div>' +
+          '</div>' +
+          '<div class="mp-controls">' + controlsHtml + '</div>' +
+        '</div>' +
+      '</div>';
+  }
+
+  function openMusicPlayer(entry, fromPlayAll) {
+    musicPlayerFromPlayAll = fromPlayAll || false;
+    musicPlayerReturnToIndex = selectedFolderIndex;
+    musicPlayerControlIndex = 0;
+    musicPlayerFastMode = null;
+    musicPlayerFastSpeed = 0;
+    musicPlayerPlayedIndices = []; // Reset played tracking
+
+    // Sync options state with Music Options
+    if (fromPlayAll) {
+      musicPlayerPlayAllOn = true;
+    } else {
+      musicPlayerPlayAllOn = false;
+    }
+    musicPlayerShuffleOn = musicShuffleOn;
+    musicPlayerRepeatOn = (musicRepeatMode === 'repeat');
+
+    buildPlayableList();
+    currentPlayingIndex = -1;
+    for (var i = 0; i < playableFiles.length; i++) {
+      if (playableFiles[i].name === entry.name) {
+        currentPlayingIndex = i;
+        break;
+      }
+    }
+    if (currentPlayingIndex === -1 && playableFiles.length > 0) {
+      currentPlayingIndex = 0;
+    }
+    currentPlayingFile = entry;
+    currentView = 'music-player';
+    startMusicPlayerTimer();
+    render();
+  }
+
+  function closeMusicPlayer() {
+    stopPlaybackTimer();
+    musicPlayerFastMode = null;
+    musicPlayerFastSpeed = 0;
+
+    // Find and select the last played file in the list before clearing state
+    if (currentPlayingIndex >= 0 && currentPlayingIndex < playableFiles.length) {
+      var lastPlayedFile = playableFiles[currentPlayingIndex];
+      for (var i = 0; i < folderEntries.length; i++) {
+        if (folderEntries[i].name === lastPlayedFile.name) {
+          selectedFolderIndex = i;
+          break;
+        }
+      }
+    } else {
+      selectedFolderIndex = musicPlayerReturnToIndex;
+    }
+
+    currentPlayingFile = null;
+    currentPlayingIndex = -1;
+    playbackElapsed = 0;
+    playbackDuration = 0;
+    isPaused = false;
+    musicPlayerPlayAllOn = false; // Reset Play All state on exit
+
+    updateMusicListScrollOffset();
+    currentView = 'split';
+    render();
+  }
+
+  function startMusicPlayerTimer() {
+    stopPlaybackTimer();
+    if (!currentPlayingFile) return;
+
+    playbackDuration = getFileDuration(currentPlayingFile.name);
+    playbackElapsed = 0;
+    isPaused = false;
+
+    playbackTimer = setInterval(function() {
+      if (!isPaused && musicPlayerFastMode === null) {
+        playbackElapsed++;
+        if (playbackElapsed >= playbackDuration) {
+          onMusicPlayerComplete();
+          return;
+        }
+      } else if (musicPlayerFastMode === 'rewind') {
+        var speeds = [2, 4, 8, 16, 32];
+        var delta = speeds[musicPlayerFastSpeed];
+        playbackElapsed = Math.max(0, playbackElapsed - delta);
+        if (playbackElapsed <= 0) {
+          playbackElapsed = 0;
+        }
+      } else if (musicPlayerFastMode === 'forward') {
+        var speeds = [2, 4, 8, 16, 32];
+        var delta = speeds[musicPlayerFastSpeed];
+        playbackElapsed = Math.min(playbackDuration - 1, playbackElapsed + delta);
+        if (playbackElapsed >= playbackDuration - 1) {
+          onMusicPlayerComplete();
+          return;
+        }
+      }
+      if (currentView === 'music-player') {
+        renderMusicPlayer();
+      }
+    }, 1000);
+  }
+
+  function onMusicPlayerComplete() {
+    stopPlaybackTimer();
+    musicPlayerFastMode = null;
+    musicPlayerFastSpeed = 0;
+
+    // Case 1: No Play all, no Repeat (with or without Shuffle)
+    // -> Play current song once, then stop
+    if (!musicPlayerPlayAllOn && !musicPlayerRepeatOn) {
+      closeMusicPlayer();
+      return;
+    }
+
+    // Case 2: Only Repeat (no Play all, with or without Shuffle)
+    // -> Repeat current song forever
+    if (!musicPlayerPlayAllOn && musicPlayerRepeatOn) {
+      playbackElapsed = 0;
+      startMusicPlayerTimer();
+      return;
+    }
+
+    // Case 3: Play all (with or without Shuffle/Repeat)
+    if (musicPlayerPlayAllOn) {
+      // Mark current song as played
+      if (musicPlayerPlayedIndices.indexOf(currentPlayingIndex) === -1) {
+        musicPlayerPlayedIndices.push(currentPlayingIndex);
+      }
+
+      var nextIndex = -1;
+
+      if (musicPlayerShuffleOn) {
+        // Shuffle mode: pick random unplayed song
+        var unplayedIndices = [];
+        for (var i = 0; i < playableFiles.length; i++) {
+          if (musicPlayerPlayedIndices.indexOf(i) === -1) {
+            unplayedIndices.push(i);
+          }
+        }
+
+        if (unplayedIndices.length > 0) {
+          // Still have unplayed songs
+          var randomIdx = Math.floor(Math.random() * unplayedIndices.length);
+          nextIndex = unplayedIndices[randomIdx];
+        } else {
+          // All songs played once
+          if (musicPlayerRepeatOn) {
+            // Play all + Shuffle + Repeat: reset and continue
+            musicPlayerPlayedIndices = [];
+            var randomIdx = Math.floor(Math.random() * playableFiles.length);
+            nextIndex = randomIdx;
+          } else {
+            // Play all + Shuffle (no Repeat): stop
+            closeMusicPlayer();
+            return;
+          }
+        }
+      } else {
+        // Sequential mode: play next in order
+        nextIndex = currentPlayingIndex + 1;
+
+        if (nextIndex >= playableFiles.length) {
+          // Reached end of playlist
+          if (musicPlayerRepeatOn) {
+            // Play all + Repeat: loop back to start
+            musicPlayerPlayedIndices = [];
+            nextIndex = 0;
+          } else {
+            // Play all (no Repeat): stop
+            closeMusicPlayer();
+            return;
+          }
+        }
+      }
+
+      if (nextIndex >= 0) {
+        playMusicAtIndex(nextIndex);
+      }
+    }
+  }
+
+  function playMusicAtIndex(index) {
+    if (index >= 0 && index < playableFiles.length) {
+      stopPlaybackTimer();
+      musicPlayerFastMode = null;
+      musicPlayerFastSpeed = 0;
+      currentPlayingIndex = index;
+      currentPlayingFile = playableFiles[index];
+      musicPlayerReturnToIndex = findFolderEntryIndex(currentPlayingFile.name);
+      startMusicPlayerTimer();
+      renderMusicPlayer();
+    }
+  }
+
+  function findFolderEntryIndex(filename) {
+    for (var i = 0; i < folderEntries.length; i++) {
+      if (folderEntries[i].name === filename) return i;
+    }
+    return 0;
+  }
+
+  function handleMusicPlayerNav(act) {
+    switch (act) {
+      case 'LEFT':
+        if (musicPlayerControlIndex > 0) {
+          musicPlayerControlIndex--;
+          renderMusicPlayer();
+        }
+        return true;
+      case 'RIGHT':
+        if (musicPlayerControlIndex < 7) {
+          musicPlayerControlIndex++;
+          renderMusicPlayer();
+        }
+        return true;
+      case 'OK':
+      case 'PLAY':
+        handleMusicPlayerOK();
+        return true;
+      case 'BACK':
+        closeMusicPlayer();
+        return true;
+      case 'FF':
+        // Direct fast forward key
+        if (musicPlayerFastMode !== 'forward') {
+          musicPlayerFastMode = 'forward';
+          musicPlayerFastSpeed = 0;
+          isPaused = true;
+        } else {
+          musicPlayerFastSpeed = (musicPlayerFastSpeed + 1) % 5;
+        }
+        renderMusicPlayer();
+        return true;
+      case 'REW':
+        // Direct rewind key
+        if (musicPlayerFastMode !== 'rewind') {
+          musicPlayerFastMode = 'rewind';
+          musicPlayerFastSpeed = 0;
+          isPaused = true;
+        } else {
+          musicPlayerFastSpeed = (musicPlayerFastSpeed + 1) % 5;
+        }
+        renderMusicPlayer();
+        return true;
+      default:
+        return false;
+    }
+  }
+
+  function handleMusicPlayerOK() {
+    // Exit fast mode when selecting any other control
+    if (musicPlayerFastMode !== null && musicPlayerControlIndex !== 1 && musicPlayerControlIndex !== 2) {
+      musicPlayerFastMode = null;
+      musicPlayerFastSpeed = 0;
+      isPaused = false;
+    }
+
+    switch (musicPlayerControlIndex) {
+      case 0: // Play/Pause
+        if (musicPlayerFastMode !== null) {
+          musicPlayerFastMode = null;
+          musicPlayerFastSpeed = 0;
+          isPaused = false;
+        } else {
+          isPaused = !isPaused;
+        }
+        break;
+      case 1: // Rewind
+        if (musicPlayerFastMode !== 'rewind') {
+          musicPlayerFastMode = 'rewind';
+          musicPlayerFastSpeed = 0;
+          isPaused = true;
+        } else {
+          musicPlayerFastSpeed = (musicPlayerFastSpeed + 1) % 5;
+        }
+        break;
+      case 2: // Fast Forward
+        if (musicPlayerFastMode !== 'forward') {
+          musicPlayerFastMode = 'forward';
+          musicPlayerFastSpeed = 0;
+          isPaused = true;
+        } else {
+          musicPlayerFastSpeed = (musicPlayerFastSpeed + 1) % 5;
+        }
+        break;
+      case 3: // Previous
+        musicPlayerFastMode = null;
+        musicPlayerFastSpeed = 0;
+        isPaused = false;
+        if (playableFiles.length > 0) {
+          var prevIndex = (currentPlayingIndex - 1 + playableFiles.length) % playableFiles.length;
+          playMusicAtIndex(prevIndex);
+        }
+        return;
+      case 4: // Next
+        musicPlayerFastMode = null;
+        musicPlayerFastSpeed = 0;
+        isPaused = false;
+        if (playableFiles.length > 0) {
+          var nextIndex = (currentPlayingIndex + 1) % playableFiles.length;
+          playMusicAtIndex(nextIndex);
+        }
+        return;
+      case 5: // Play All
+        musicPlayerPlayAllOn = !musicPlayerPlayAllOn;
+        // Reset played tracking when toggling Play All
+        musicPlayerPlayedIndices = [];
+        break;
+      case 6: // Shuffle
+        musicPlayerShuffleOn = !musicPlayerShuffleOn;
+        // Sync back to Music Options
+        musicShuffleOn = musicPlayerShuffleOn;
+        // Reset played tracking when toggling Shuffle
+        musicPlayerPlayedIndices = [];
+        break;
+      case 7: // Repeat
+        musicPlayerRepeatOn = !musicPlayerRepeatOn;
+        // Sync back to Music Options
+        musicRepeatMode = musicPlayerRepeatOn ? 'repeat' : 'play-once';
+        break;
+    }
+    renderMusicPlayer();
+  }
+
   function handleMusicOptionsOK() {
     var playAllIdx = musicOptionsFromLeftPanel ? -1 : 0;
     var shuffleIdx = musicOptionsFromLeftPanel ? 0 : 1;
@@ -1095,13 +1575,27 @@
 
     if (musicOptionsIndex === playAllIdx) {
       closeMusicOptions();
-      playAllMusic();
+      playAllMusicFromOptions();
     } else if (musicOptionsIndex === shuffleIdx) {
       musicShuffleOn = !musicShuffleOn;
       renderMusicOptions();
     } else if (musicOptionsIndex === repeatIdx) {
       openMusicRepeatSubmenu();
     }
+  }
+
+  function playAllMusicFromOptions() {
+    buildPlayableList();
+    if (playableFiles.length === 0) return;
+
+    var startEntry;
+    if (musicShuffleOn) {
+      var startIndex = Math.floor(Math.random() * playableFiles.length);
+      startEntry = playableFiles[startIndex];
+    } else {
+      startEntry = playableFiles[0];
+    }
+    openMusicPlayer(startEntry, true);
   }
 
   function playAllMusic() {
@@ -1550,7 +2044,11 @@
         if (entry.isDirectory) {
           enterFolder(entry.name);
         } else if (isPlayableFile(entry.name)) {
-          playFile(entry);
+          if (isMusicFile(entry.name)) {
+            openMusicPlayer(entry, false);
+          } else {
+            playFile(entry);
+          }
         }
       }
     } else if (currentView === 'playing') {
@@ -1790,6 +2288,11 @@
       return false;
     }
 
+    // Handle music-player view
+    if (currentView === 'music-player') {
+      return handleMusicPlayerNav(act);
+    }
+
     // Handle split/devices views
     switch (act) {
       case 'UP':
@@ -1812,7 +2315,11 @@
         if (currentView === 'split' && activePanel === 'right' && folderEntries.length > 0) {
           var entry = folderEntries[selectedFolderIndex];
           if (!entry.isDirectory && isPlayableFile(entry.name)) {
-            playFile(entry);
+            if (isMusicFile(entry.name)) {
+              openMusicPlayer(entry, false);
+            } else {
+              playFile(entry);
+            }
             return true;
           }
         }
@@ -2043,6 +2550,35 @@
         '.music-repeat-name{flex:1;font-size:1.4rem;font-weight:500}' +
         '.music-repeat-check{font-size:1.4rem;color:#e2e8f0}' +
         '.music-repeat-item.music-repeat-item-selected .music-repeat-check{color:#fff}' +
+        // Music Player styles (matching reference mp.jpg)
+        '.music-player-view{position:absolute;inset:0;display:none;flex-direction:column;background:#0d0f14}' +
+        '.mp-bg{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;' +
+          'background:linear-gradient(135deg,#1a1a2e 0%,#16213e 50%,#2d132c 100%)}' +
+        '.mp-timer{font-size:14rem;font-weight:200;color:rgba(255,255,255,.12);' +
+          'font-family:"Segoe UI Light","Segoe UI",sans-serif;letter-spacing:12px;user-select:none}' +
+        '.mp-hud{position:absolute;bottom:60px;left:80px;right:80px;' +
+          'background:rgba(74,85,104,0.95);border-radius:16px;display:flex;flex-direction:row;' +
+          'padding:24px 32px;gap:32px;box-shadow:0 8px 40px rgba(0,0,0,.6)}' +
+        '.mp-art{width:180px;height:180px;flex-shrink:0;border-radius:12px;overflow:hidden;' +
+          'background:#4a5568;display:flex;align-items:center;justify-content:center}' +
+        '.mp-art svg{display:block}' +
+        '.mp-info{flex:1;display:flex;flex-direction:column;justify-content:center;gap:12px}' +
+        '.mp-filename{color:#fff;font-size:2rem;font-weight:600;' +
+          'overflow:hidden;text-overflow:ellipsis;white-space:nowrap}' +
+        '.mp-meta{color:#cbd5e0;font-size:1.3rem;' +
+          'overflow:hidden;text-overflow:ellipsis;white-space:nowrap}' +
+        '.mp-progress{display:flex;flex-direction:column;gap:8px}' +
+        '.mp-progress-bar{height:8px;background:#2d3748;border-radius:4px;overflow:hidden}' +
+        '.mp-progress-fill{height:100%;background:linear-gradient(90deg,#3182ce,#ffc239);border-radius:4px;' +
+          'transition:width .3s ease-out}' +
+        '.mp-time{display:flex;justify-content:flex-end;gap:4px;color:#a0aec0;font-size:1.2rem}' +
+        '.mp-controls{display:flex;flex-direction:row;align-items:center;justify-content:center;gap:32px;margin-top:16px}' +
+        '.mp-ctrl-btn{width:100px;height:100px;display:flex;align-items:center;justify-content:center;' +
+          'border-radius:12px;cursor:pointer;transition:all .15s;border:3px solid transparent}' +
+        '.mp-ctrl-btn:hover{background:rgba(255,255,255,.1)}' +
+        '.mp-ctrl-btn.mp-ctrl-selected{background:#3182ce;border-color:#fff}' +
+        '.mp-ctrl-btn.mp-ctrl-off svg{opacity:.5}' +
+        '.mp-fast-speed{color:#fff;font-size:2.4rem;font-weight:700}' +
         '</style>' +
         '<div class="usb-root">' +
           '<div class="usb-player">' +
@@ -2065,6 +2601,7 @@
             '<div class="usb-video-info"></div>' +
             '<div class="music-options"></div>' +
             '<div class="music-repeat-submenu"></div>' +
+            '<div class="music-player-view"></div>' +
           '</div>' +
         '</div>';
       stageEl = el.querySelector('.usb-stage');
@@ -2082,6 +2619,7 @@
       videoInfoEl = el.querySelector('.usb-video-info');
       musicOptionsEl = el.querySelector('.music-options');
       musicRepeatSubmenuEl = el.querySelector('.music-repeat-submenu');
+      musicPlayerEl = el.querySelector('.music-player-view');
     },
 
     onShow: function (params) {
@@ -2192,7 +2730,11 @@
           if (currentView === 'split' && activePanel === 'right' && folderEntries.length > 0) {
             var entry = folderEntries[selectedFolderIndex];
             if (!entry.isDirectory && isPlayableFile(entry.name)) {
-              playFile(entry);
+              if (isMusicFile(entry.name)) {
+                openMusicPlayer(entry, false);
+              } else {
+                playFile(entry);
+              }
               handled = true;
               break;
             }
