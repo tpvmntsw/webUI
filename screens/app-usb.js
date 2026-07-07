@@ -184,6 +184,7 @@
     { id: 'music', name: 'Music', icon: '&#127925;' }
   ];
 
+
   // Mock data for each category (20+ items per root)
   var MOCK_DATA = {
     folders: {
@@ -626,6 +627,10 @@
   // Scroll offset for smooth scrolling (row-based)
   var scrollRowOffset = 0;
 
+  // Music list view settings
+  var MUSIC_LIST_VISIBLE = 11;
+  var musicListScrollOffset = 0;
+
   // Device list scrolling (max visible items)
   var DEVICE_VISIBLE_COUNT = 7;
   var deviceScrollOffset = 0;
@@ -633,6 +638,13 @@
   function renderRightPanel() {
     if (!rightPanelEl) return;
     var cat = CATEGORIES[selectedCategoryIndex];
+
+    // Use music list view for Music category
+    if (cat.id === 'music') {
+      renderMusicListView();
+      return;
+    }
+
     var pathDisplay = currentPath.length > 0 ? currentPath.join(' / ') : cat.name;
     var html = '<div class="usb-right-header">' + escapeHtml(pathDisplay) + '</div>';
     html += '<div class="usb-right-content-wrapper">';
@@ -671,6 +683,103 @@
       }
     }
     html += '</div>';
+    rightPanelEl.innerHTML = html;
+  }
+
+  function updateMusicListScrollOffset() {
+    var total = folderEntries.length;
+    if (total <= MUSIC_LIST_VISIBLE) {
+      musicListScrollOffset = 0;
+      return;
+    }
+
+    var visibleStart = musicListScrollOffset;
+    var visibleEnd = musicListScrollOffset + MUSIC_LIST_VISIBLE - 1;
+
+    if (selectedFolderIndex > visibleEnd) {
+      musicListScrollOffset = selectedFolderIndex - (MUSIC_LIST_VISIBLE - 1);
+    } else if (selectedFolderIndex < visibleStart) {
+      musicListScrollOffset = selectedFolderIndex;
+    } else if (selectedFolderIndex === visibleEnd && selectedFolderIndex < total - 1) {
+      musicListScrollOffset = Math.min(selectedFolderIndex - (MUSIC_LIST_VISIBLE - 2), total - MUSIC_LIST_VISIBLE);
+    } else if (selectedFolderIndex === visibleStart && musicListScrollOffset > 0) {
+      musicListScrollOffset = Math.max(selectedFolderIndex - 1, 0);
+    }
+
+    var maxOffset = Math.max(0, total - MUSIC_LIST_VISIBLE);
+    musicListScrollOffset = Math.max(0, Math.min(musicListScrollOffset, maxOffset));
+  }
+
+  function renderMusicListView() {
+    if (!rightPanelEl) return;
+
+    // Use same header style as Videos/Photos
+    var pathDisplay = currentPath.length > 0 ? currentPath.join(' / ') : 'Music';
+    var html = '<div class="usb-right-header">' + escapeHtml(pathDisplay) + '</div>';
+
+    html += '<div class="usb-music-body">';
+
+    // Left: track list
+    html += '<div class="usb-music-list-container">';
+    if (folderEntries.length === 0) {
+      html += '<div class="usb-empty">Empty</div>';
+    } else {
+      var total = folderEntries.length;
+      var startIdx = musicListScrollOffset;
+      var endIdx = Math.min(startIdx + MUSIC_LIST_VISIBLE, total);
+
+      html += '<div class="usb-music-list">';
+      for (var i = startIdx; i < endIdx; i++) {
+        var entry = folderEntries[i];
+        var isSelected = (activePanel === 'right' && i === selectedFolderIndex);
+        var cls = 'usb-music-row' + (isSelected ? ' usb-music-row-selected' : '');
+        html += '<div class="' + cls + '" data-index="' + i + '">' +
+          '<span class="usb-music-row-icon">&#9835;</span>' +
+          '<span class="usb-music-row-name">' + escapeHtml(entry.name) + '</span>' +
+          '</div>';
+      }
+      html += '</div>';
+
+      // Scrollbar
+      if (total > MUSIC_LIST_VISIBLE) {
+        var scrollbarHeight = Math.max(30, (MUSIC_LIST_VISIBLE / total) * 100);
+        var maxScrollOffset = total - MUSIC_LIST_VISIBLE;
+        var scrollbarTop = maxScrollOffset > 0 ? (musicListScrollOffset / maxScrollOffset) * (100 - scrollbarHeight) : 0;
+        html += '<div class="usb-music-scrollbar-track">' +
+          '<div class="usb-music-scrollbar-thumb" style="height:' + scrollbarHeight + '%;top:' + scrollbarTop + '%"></div>' +
+          '</div>';
+      }
+    }
+    html += '</div>';
+
+    // Right: info panel (only show when activePanel === 'right' and a file is selected)
+    html += '<div class="usb-music-info-panel">';
+    if (activePanel === 'right' && folderEntries.length > 0 && selectedFolderIndex < folderEntries.length) {
+      var entry = folderEntries[selectedFolderIndex];
+      var musicInfo = generateMockMusicInfo();
+      var duration = getFileDuration(entry.name);
+      var durationStr = formatDuration(duration);
+
+      // Album art placeholder (music note icon as SVG)
+      html += '<div class="usb-music-info-art">';
+      html += '<svg viewBox="0 0 100 100" width="280" height="280" xmlns="http://www.w3.org/2000/svg">' +
+        '<rect width="100" height="100" fill="#1d2430" rx="8"/>' +
+        '<text x="50" y="62" text-anchor="middle" font-size="40" fill="#8a94a6">&#9835;</text>' +
+        '</svg>';
+      html += '</div>';
+
+      html += '<div class="usb-music-info-details">';
+      html += '<div class="usb-music-info-filename">' + escapeHtml(entry.name) + '</div>';
+      html += '<div class="usb-music-info-row"><span class="usb-music-info-label">Duration:</span> ' + durationStr + '</div>';
+      html += '<div class="usb-music-info-row"><span class="usb-music-info-label">Artist:</span> ' + escapeHtml(musicInfo.artist) + '</div>';
+      html += '<div class="usb-music-info-row"><span class="usb-music-info-label">Album:</span> ' + escapeHtml(musicInfo.album) + '</div>';
+      html += '<div class="usb-music-info-row"><span class="usb-music-info-label">Genre:</span> Pop</div>';
+      html += '</div>';
+    }
+    html += '</div>';
+
+    html += '</div>';
+
     rightPanelEl.innerHTML = html;
   }
 
@@ -1061,13 +1170,54 @@
     render();
   }
 
+  function collectAllMusicFiles(categoryData) {
+    var allFiles = [];
+    var visited = {};
+
+    function collectFromFolder(folderKey) {
+      if (visited[folderKey]) return;
+      visited[folderKey] = true;
+
+      var entries = categoryData[folderKey] || [];
+      for (var i = 0; i < entries.length; i++) {
+        var entry = entries[i];
+        if (entry.isDirectory) {
+          collectFromFolder(entry.name);
+        } else if (isMusicFile(entry.name)) {
+          allFiles.push(entry);
+        }
+      }
+    }
+
+    collectFromFolder('root');
+
+    // Sort by filename: 0-9, A-Z, a-z
+    allFiles.sort(function(a, b) {
+      return a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' });
+    });
+
+    return allFiles;
+  }
+
   function loadCategoryContent(categoryId) {
     var categoryData = MOCK_DATA[categoryId] || {};
-    folderEntries = categoryData['root'] || [];
+
+    if (categoryId === 'music') {
+      // For music, collect all music files from all folders and sort them
+      folderEntries = collectAllMusicFiles(categoryData);
+    } else {
+      folderEntries = categoryData['root'] || [];
+    }
+
     selectedFolderIndex = 0;
     scrollRowOffset = 0;
+    musicListScrollOffset = 0;
     currentPath = [];
     navigationStack = [];
+  }
+
+  function isMusicCategory() {
+    return CATEGORIES[selectedCategoryIndex].id === 'music';
   }
 
   function moveSelectionVertical(dir) {
@@ -1090,12 +1240,22 @@
         }
       } else {
         if (folderEntries.length === 0) return;
-        // Move by row (GRID_COLS items per row)
-        var newIndex = selectedFolderIndex + (dir * GRID_COLS);
-        if (newIndex >= 0 && newIndex < folderEntries.length) {
-          selectedFolderIndex = newIndex;
-          updateScrollOffset();
-          renderRightPanel();
+        // Music category uses list view (single item per move)
+        if (isMusicCategory()) {
+          var newIndex = selectedFolderIndex + dir;
+          if (newIndex >= 0 && newIndex < folderEntries.length) {
+            selectedFolderIndex = newIndex;
+            updateMusicListScrollOffset();
+            renderRightPanel();
+          }
+        } else {
+          // Move by row (GRID_COLS items per row)
+          var newIndex = selectedFolderIndex + (dir * GRID_COLS);
+          if (newIndex >= 0 && newIndex < folderEntries.length) {
+            selectedFolderIndex = newIndex;
+            updateScrollOffset();
+            renderRightPanel();
+          }
         }
       }
     }
@@ -1103,6 +1263,12 @@
 
   function moveSelectionHorizontalInGrid(dir) {
     if (folderEntries.length === 0) return false;
+
+    // Music category uses list view - no horizontal movement in list
+    if (isMusicCategory()) {
+      return true;
+    }
+
     var newIndex = selectedFolderIndex + dir;
     // Check if we're at the edge of the grid
     var currentCol = selectedFolderIndex % GRID_COLS;
@@ -1130,6 +1296,7 @@
         activePanel = 'right';
         selectedFolderIndex = 0;
         scrollRowOffset = 0;
+        musicListScrollOffset = 0;
         renderLeftPanel();
         renderRightPanel();
       }
@@ -1142,6 +1309,25 @@
 
   function moveLeft() {
     if (currentView === 'split' && activePanel === 'right') {
+      // Music category uses list view - LEFT always goes back to left panel or parent folder
+      if (isMusicCategory()) {
+        if (navigationStack.length > 0) {
+          var prev = navigationStack.pop();
+          currentPath.pop();
+          loadMockFolder(prev.folder);
+          selectedFolderIndex = prev.selectedIndex;
+          musicListScrollOffset = prev.scrollOffset || 0;
+          updateMusicListScrollOffset();
+          renderRightPanel();
+          return true;
+        }
+        // Go back to left panel
+        activePanel = 'left';
+        renderLeftPanel();
+        renderRightPanel();
+        return true;
+      }
+
       var currentCol = selectedFolderIndex % GRID_COLS;
       if (currentCol > 0) {
         // Move left within grid
@@ -1176,7 +1362,7 @@
     navigationStack.push({
       folder: currentFolderKey,
       selectedIndex: selectedFolderIndex,
-      scrollOffset: scrollRowOffset
+      scrollOffset: isMusicCategory() ? musicListScrollOffset : scrollRowOffset
     });
     currentPath.push(folderName);
     loadMockFolder(folderName);
@@ -1189,6 +1375,7 @@
     folderEntries = categoryData[folderName] || [];
     selectedFolderIndex = 0;
     scrollRowOffset = 0;
+    musicListScrollOffset = 0;
   }
 
   function enterSelected() {
@@ -1234,8 +1421,13 @@
           currentPath.pop();
           loadMockFolder(prev.folder);
           selectedFolderIndex = prev.selectedIndex;
-          scrollRowOffset = prev.scrollOffset || 0;
-          updateScrollOffset();
+          if (isMusicCategory()) {
+            musicListScrollOffset = prev.scrollOffset || 0;
+            updateMusicListScrollOffset();
+          } else {
+            scrollRowOffset = prev.scrollOffset || 0;
+            updateScrollOffset();
+          }
           renderRightPanel();
           return true;
         }
@@ -1251,6 +1443,7 @@
       currentPath = [];
       navigationStack = [];
       scrollRowOffset = 0;
+      musicListScrollOffset = 0;
       render();
       return true;
     } else if (currentView === 'devices') {
@@ -1504,6 +1697,32 @@
           'background:rgba(42,49,64,0.3);border-radius:4px}' +
         '.usb-scrollbar-thumb{position:absolute;width:100%;background:rgba(138,148,166,0.4);' +
           'border-radius:4px;transition:top .15s ease-out}' +
+        // Music list view styles
+        '.usb-music-body{flex:1;display:flex;flex-direction:row;overflow:hidden}' +
+        '.usb-music-list-container{flex:1;display:flex;flex-direction:row;position:relative;' +
+          'padding:16px 24px;overflow:hidden}' +
+        '.usb-music-list{flex:1;display:flex;flex-direction:column;gap:4px;overflow:hidden}' +
+        '.usb-music-row{display:flex;align-items:center;padding:14px 20px;' +
+          'background:transparent;border-radius:8px;color:#e6ebf2;cursor:pointer;transition:all .15s}' +
+        '.usb-music-row:hover{background:#1d2430}' +
+        '.usb-music-row.usb-music-row-selected{background:#3a86ff;color:#fff}' +
+        '.usb-music-row-icon{font-size:1.6rem;margin-right:16px;min-width:28px;color:#8a94a6}' +
+        '.usb-music-row.usb-music-row-selected .usb-music-row-icon{color:#fff}' +
+        '.usb-music-row-name{font-size:1.3rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}' +
+        '.usb-music-scrollbar-track{position:absolute;right:8px;top:16px;bottom:16px;width:6px;' +
+          'background:rgba(42,49,64,0.3);border-radius:3px}' +
+        '.usb-music-scrollbar-thumb{position:absolute;width:100%;background:rgba(138,148,166,0.4);' +
+          'border-radius:3px;transition:top .15s ease-out}' +
+        '.usb-music-info-panel{width:500px;background:#11151c;border-left:1px solid #2a3140;' +
+          'display:flex;flex-direction:column;align-items:center;padding:48px 40px;gap:32px}' +
+        '.usb-music-info-art{width:280px;height:280px;display:flex;align-items:center;justify-content:center;' +
+          'background:#1d2430;border-radius:16px;overflow:hidden}' +
+        '.usb-music-info-art svg{display:block}' +
+        '.usb-music-info-details{width:100%;display:flex;flex-direction:column;gap:12px}' +
+        '.usb-music-info-filename{color:#e6ebf2;font-size:1.6rem;font-weight:600;' +
+          'overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:center;margin-bottom:12px}' +
+        '.usb-music-info-row{color:#8a94a6;font-size:1.4rem;line-height:1.6}' +
+        '.usb-music-info-label{color:#e6ebf2;font-weight:500}' +
         // Player view styles - fullscreen playback with simulated video background
         '.usb-player-view{position:absolute;inset:0;display:none;flex-direction:column}' +
         // Fullscreen simulated background
