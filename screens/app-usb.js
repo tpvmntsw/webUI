@@ -1043,7 +1043,7 @@
       '</div>' +
       '<div class="music-repeat-list">' +
         '<div class="' + playOnceCls + '" data-index="0">' +
-          '<span class="music-repeat-name">Play Once</span>' +
+          '<span class="music-repeat-name">Play once</span>' +
           playOnceCheck +
         '</div>' +
         '<div class="' + repeatCls + '" data-index="1">' +
@@ -1994,7 +1994,7 @@
           'background:rgba(0,0,0,.7);backdrop-filter:blur(4px)}' +
         '.usb-video-info-dialog{background:#4a5568;border:3px solid #718096;border-radius:16px;' +
           'padding:32px 48px;min-width:480px;box-shadow:0 12px 60px rgba(0,0,0,.8)}' +
-        '.usb-video-info-title{color:#e2e8f0;font-size:2rem;font-weight:600;margin-bottom:28px}' +
+        '.usb-video-info-title{color:#ffc239;font-size:2rem;font-weight:600;margin-bottom:28px}' +
         '.usb-video-info-content{margin-bottom:32px}' +
         '.usb-video-info-row{color:#e2e8f0;font-size:1.4rem;margin:12px 0;line-height:1.6}' +
         '.usb-video-info-label{color:#e2e8f0;font-weight:600}' +
@@ -2004,22 +2004,22 @@
         '.usb-video-info-close:hover{background:#2b6cb0}' +
         // Fullscreen views (split/playing) - positioned outside usb-player window
         '.usb-fullscreen{position:absolute;inset:0;display:none;background:#0d0f14}' +
-        // Music Options dialog styles (matching Music header style)
+        // Music Options dialog styles (matching Info Menu style)
         '.music-options{position:absolute;inset:0;display:none;align-items:flex-start;justify-content:flex-start;' +
-          'background:transparent;padding-top:80px;padding-left:60px}' +
-        '.music-opt-dialog{background:#3a4556;border-radius:8px;min-width:420px;' +
-          'box-shadow:0 8px 40px rgba(0,0,0,.6);overflow:hidden}' +
-        '.music-opt-header{padding:20px 28px;background:#11151c;border-bottom:1px solid #2a3140}' +
-        '.music-opt-title{font-size:1.6rem;font-weight:600;color:#ffc239;letter-spacing:.5px}' +
-        '.music-opt-list{padding:8px 0;background:#0d0f14}' +
-        '.music-opt-item{display:flex;align-items:center;padding:18px 28px;color:#e6ebf2;' +
-          'cursor:pointer;transition:all .15s}' +
-        '.music-opt-item:hover{background:#1d2430}' +
-        '.music-opt-item.music-opt-item-selected{background:#3a86ff;color:#fff}' +
+          'background:rgba(0,0,0,.5);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);padding-top:80px;padding-left:60px}' +
+        '.music-opt-dialog{background:#4a5568;border:3px solid #718096;border-radius:16px;min-width:420px;' +
+          'padding:32px 48px;box-shadow:0 12px 60px rgba(0,0,0,.8)}' +
+        '.music-opt-header{margin-bottom:24px}' +
+        '.music-opt-title{font-size:2rem;font-weight:600;color:#ffc239;letter-spacing:.5px}' +
+        '.music-opt-list{display:flex;flex-direction:column;gap:8px}' +
+        '.music-opt-item{display:flex;align-items:center;padding:18px 24px;color:#e2e8f0;' +
+          'background:#5a6578;border:2px solid #718096;border-radius:12px;cursor:pointer;transition:all .15s}' +
+        '.music-opt-item:hover{background:#6a7588;border-color:#8a94a6}' +
+        '.music-opt-item.music-opt-item-selected{background:#3182ce;color:#fff;border-color:#fff}' +
         '.music-opt-name{flex:1;font-size:1.4rem;font-weight:500}' +
-        '.music-opt-arrow{font-size:1.2rem;color:#8a94a6}' +
+        '.music-opt-arrow{font-size:1.2rem;color:#a0aec0}' +
         '.music-opt-item.music-opt-item-selected .music-opt-arrow{color:#fff}' +
-        // Toggle switch styles
+        // Toggle switch styles (updated for Info Menu style)
         '.music-opt-toggle{display:inline-block;width:52px;height:28px;border-radius:14px;position:relative;' +
           'transition:background .2s}' +
         '.music-opt-toggle::after{content:"";position:absolute;top:3px;width:22px;height:22px;' +
@@ -2028,20 +2028,20 @@
         '.music-opt-toggle-off::after{left:3px}' +
         '.music-opt-toggle-on{background:#3a86ff}' +
         '.music-opt-toggle-on::after{left:27px}' +
-        // Music Repeat submenu dialog styles (matching Music header style)
+        // Music Repeat submenu dialog styles (matching Info Menu style)
         '.music-repeat-submenu{position:absolute;inset:0;display:none;align-items:flex-start;justify-content:flex-start;' +
-          'background:transparent;padding-top:80px;padding-left:60px}' +
-        '.music-repeat-dialog{background:#0d0f14;border-radius:8px;min-width:420px;' +
-          'box-shadow:0 8px 40px rgba(0,0,0,.6);overflow:hidden}' +
-        '.music-repeat-header{padding:20px 28px;background:#11151c;border-bottom:1px solid #2a3140}' +
-        '.music-repeat-title{font-size:1.6rem;font-weight:600;color:#ffc239;letter-spacing:.5px}' +
-        '.music-repeat-list{padding:8px 0}' +
-        '.music-repeat-item{display:flex;align-items:center;padding:18px 28px;color:#e6ebf2;' +
-          'cursor:pointer;transition:all .15s}' +
-        '.music-repeat-item:hover{background:#1d2430}' +
-        '.music-repeat-item.music-repeat-item-selected{background:#3a86ff;color:#fff}' +
+          'background:rgba(0,0,0,.5);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);padding-top:80px;padding-left:60px}' +
+        '.music-repeat-dialog{background:#4a5568;border:3px solid #718096;border-radius:16px;min-width:420px;' +
+          'padding:32px 48px;box-shadow:0 12px 60px rgba(0,0,0,.8)}' +
+        '.music-repeat-header{margin-bottom:24px}' +
+        '.music-repeat-title{font-size:2rem;font-weight:600;color:#ffc239;letter-spacing:.5px}' +
+        '.music-repeat-list{display:flex;flex-direction:column;gap:8px}' +
+        '.music-repeat-item{display:flex;align-items:center;padding:18px 24px;color:#e2e8f0;' +
+          'background:#5a6578;border:2px solid #718096;border-radius:12px;cursor:pointer;transition:all .15s}' +
+        '.music-repeat-item:hover{background:#6a7588;border-color:#8a94a6}' +
+        '.music-repeat-item.music-repeat-item-selected{background:#3182ce;color:#fff;border-color:#fff}' +
         '.music-repeat-name{flex:1;font-size:1.4rem;font-weight:500}' +
-        '.music-repeat-check{font-size:1.4rem;color:#ffc239}' +
+        '.music-repeat-check{font-size:1.4rem;color:#e2e8f0}' +
         '.music-repeat-item.music-repeat-item-selected .music-repeat-check{color:#fff}' +
         '</style>' +
         '<div class="usb-root">' +
