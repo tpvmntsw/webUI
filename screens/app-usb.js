@@ -38,9 +38,16 @@
 
   var usbDevices = [];
   var selectedDeviceIndex = 0;
-  // 'idle' | 'devices' | 'split' | 'playing' | 'option-menu' | 'video-info' | 'music-options' | 'music-repeat-submenu' | 'music-player'
+  // 'idle' | 'devices' | 'split' | 'playing' | 'option-menu' | 'video-info' | 'music-options' | 'music-repeat-submenu' | 'music-player' | 'photo-options' | 'photo-viewmode-submenu' | 'photo-repeat-submenu' | 'photo-slidespeed-submenu' | 'photo-player' | 'photo-info' | 'photo-slidespeed-menu'
   var currentView = 'idle';
   var musicPlayerEl = null;
+  var photoOptionsEl = null;
+  var photoViewmodeSubmenuEl = null;
+  var photoRepeatSubmenuEl = null;
+  var photoSlidespeedSubmenuEl = null;
+  var photoPlayerEl = null;
+  var photoInfoEl = null;
+  var photoSlidespeedMenuEl = null;
   var currentDeviceId = null;
   // 'left' | 'right' - which panel is active
   var activePanel = 'left';
@@ -80,6 +87,31 @@
   var musicPlayerReturnToIndex = 0; // index in folderEntries to return to after BACK
   var musicPlayerFromPlayAll = false; // true if entered via Play all option
   var musicPlayerPlayedIndices = []; // tracks which songs have been played in Play all mode
+
+  // Photo Options state
+  var photoOptionsIndex = 0;
+  var photoViewMode = 'thumbnails'; // 'thumbnails' | 'list'
+  var photoShuffleOn = false;
+  var photoRepeatMode = 'play-once'; // 'play-once' | 'repeat'
+  var photoSlideSpeed = 'fast'; // 'fast' | 'medium' | 'slow'
+  var photoViewmodeSubmenuIndex = 0;
+  var photoRepeatSubmenuIndex = 0;
+  var photoSlidespeedSubmenuIndex = 0;
+  var photoOptionsFromLeftPanel = false;
+
+  // Photo Player state
+  var photoPlayerControlIndex = 0; // 0-5: play/pause, prev, next, shuffle, repeat, slidespeed
+  var photoPlayerPlayAllOn = false;
+  var photoPlayerShuffleOn = false;
+  var photoPlayerRepeatOn = false; // false = play once, true = repeat
+  var photoPlayerSlideSpeed = 'fast'; // 'fast' | 'medium' | 'slow'
+  var photoPlayerReturnToIndex = 0;
+  var photoPlayerFromSlideshow = false;
+  var photoPlayerPlayedIndices = [];
+  var photoSlidespeedMenuIndex = 0; // for the clock icon menu in player
+
+  // Slide show speed mapping (seconds)
+  var SLIDE_SPEED_SECONDS = { fast: 4, medium: 8, slow: 12 };
 
   // Playback modes
   var PLAYBACK_MODES = [
@@ -474,7 +506,7 @@
   };
 
   function render() {
-    if (!idleEl || !deviceListEl || !splitViewEl || !playerViewEl || !optionMenuEl || !videoInfoEl || !fullscreenEl || !windowEl || !musicOptionsEl || !musicRepeatSubmenuEl || !musicPlayerEl) return;
+    if (!idleEl || !deviceListEl || !splitViewEl || !playerViewEl || !optionMenuEl || !videoInfoEl || !fullscreenEl || !windowEl || !musicOptionsEl || !musicRepeatSubmenuEl || !musicPlayerEl || !photoOptionsEl || !photoViewmodeSubmenuEl || !photoRepeatSubmenuEl || !photoSlidespeedSubmenuEl || !photoPlayerEl || !photoInfoEl || !photoSlidespeedMenuEl) return;
 
     // Hide all views
     idleEl.style.display = 'none';
@@ -486,12 +518,23 @@
     musicOptionsEl.style.display = 'none';
     musicRepeatSubmenuEl.style.display = 'none';
     musicPlayerEl.style.display = 'none';
+    photoOptionsEl.style.display = 'none';
+    photoViewmodeSubmenuEl.style.display = 'none';
+    photoRepeatSubmenuEl.style.display = 'none';
+    photoSlidespeedSubmenuEl.style.display = 'none';
+    photoPlayerEl.style.display = 'none';
+    photoInfoEl.style.display = 'none';
+    photoSlidespeedMenuEl.style.display = 'none';
 
-    // Determine if we're in fullscreen mode (split/playing/option-menu/video-info/music-options/music-repeat-submenu/music-player)
+    // Determine if we're in fullscreen mode (split/playing/option-menu/video-info/music-options/music-repeat-submenu/music-player/photo-*)
     var isFullscreenView = (currentView === 'split' || currentView === 'playing' ||
                             currentView === 'option-menu' || currentView === 'video-info' ||
                             currentView === 'music-options' || currentView === 'music-repeat-submenu' ||
-                            currentView === 'music-player');
+                            currentView === 'music-player' ||
+                            currentView === 'photo-options' || currentView === 'photo-viewmode-submenu' ||
+                            currentView === 'photo-repeat-submenu' || currentView === 'photo-slidespeed-submenu' ||
+                            currentView === 'photo-player' || currentView === 'photo-info' ||
+                            currentView === 'photo-slidespeed-menu');
 
     // Toggle between windowed (idle/devices) and fullscreen (split/playing) containers
     windowEl.style.display = isFullscreenView ? 'none' : 'flex';
@@ -549,6 +592,44 @@
     } else if (currentView === 'music-player') {
       musicPlayerEl.style.display = 'flex';
       renderMusicPlayer();
+    } else if (currentView === 'photo-options') {
+      splitViewEl.style.display = 'flex';
+      photoOptionsEl.style.display = 'flex';
+      renderLeftPanel();
+      renderRightPanel();
+      renderPhotoOptions();
+    } else if (currentView === 'photo-viewmode-submenu') {
+      splitViewEl.style.display = 'flex';
+      photoViewmodeSubmenuEl.style.display = 'flex';
+      renderLeftPanel();
+      renderRightPanel();
+      renderPhotoViewmodeSubmenu();
+    } else if (currentView === 'photo-repeat-submenu') {
+      splitViewEl.style.display = 'flex';
+      photoRepeatSubmenuEl.style.display = 'flex';
+      renderLeftPanel();
+      renderRightPanel();
+      renderPhotoRepeatSubmenu();
+    } else if (currentView === 'photo-slidespeed-submenu') {
+      splitViewEl.style.display = 'flex';
+      photoSlidespeedSubmenuEl.style.display = 'flex';
+      renderLeftPanel();
+      renderRightPanel();
+      renderPhotoSlidespeedSubmenu();
+    } else if (currentView === 'photo-player') {
+      photoPlayerEl.style.display = 'flex';
+      renderPhotoPlayer();
+    } else if (currentView === 'photo-info') {
+      splitViewEl.style.display = 'flex';
+      photoInfoEl.style.display = 'flex';
+      renderLeftPanel();
+      renderRightPanel();
+      renderPhotoInfo();
+    } else if (currentView === 'photo-slidespeed-menu') {
+      photoPlayerEl.style.display = 'flex';
+      photoSlidespeedMenuEl.style.display = 'flex';
+      renderPhotoPlayer();
+      renderPhotoSlidespeedMenu();
     }
   }
 
@@ -1056,7 +1137,7 @@
 
     var html = '<div class="music-repeat-dialog">' +
       '<div class="music-repeat-header">' +
-        '<span class="music-repeat-title">Options / Repeat</span>' +
+        '<span class="music-repeat-title">Repeat</span>' +
       '</div>' +
       '<div class="music-repeat-list">' +
         '<div class="' + playOnceCls + '" data-index="0">' +
@@ -1443,6 +1524,755 @@
       if (folderEntries[i].name === filename) return i;
     }
     return 0;
+  }
+
+  // Photo Options functions
+  function openPhotoOptions(fromLeftPanel) {
+    var cat = CATEGORIES[selectedCategoryIndex];
+    if (cat.id !== 'photo') return false;
+
+    photoOptionsFromLeftPanel = fromLeftPanel;
+    photoOptionsIndex = 0;
+    currentView = 'photo-options';
+    render();
+    return true;
+  }
+
+  function closePhotoOptions() {
+    currentView = 'split';
+    render();
+  }
+
+  function renderPhotoOptions() {
+    if (!photoOptionsEl) return;
+
+    var shuffleToggle = photoShuffleOn ?
+      '<span class="photo-opt-toggle photo-opt-toggle-on"></span>' :
+      '<span class="photo-opt-toggle photo-opt-toggle-off"></span>';
+
+    // Determine menu items based on context
+    var hasSlideshow = !photoOptionsFromLeftPanel && folderEntries.length > 0 &&
+                       selectedFolderIndex < folderEntries.length &&
+                       !folderEntries[selectedFolderIndex].isDirectory &&
+                       isPhotoFile(folderEntries[selectedFolderIndex].name);
+    var hasInfo = hasSlideshow;
+
+    var html = '<div class="photo-opt-dialog">' +
+      '<div class="photo-opt-header">' +
+        '<span class="photo-opt-title">Options</span>' +
+      '</div>' +
+      '<div class="photo-opt-list">';
+
+    var idx = 0;
+
+    // Slideshow option (only for photo files)
+    if (hasSlideshow) {
+      var slideshowCls = 'photo-opt-item' + (photoOptionsIndex === idx ? ' photo-opt-item-selected' : '');
+      html += '<div class="' + slideshowCls + '" data-index="' + idx + '">' +
+        '<span class="photo-opt-name">Slide show</span>' +
+      '</div>';
+      idx++;
+    }
+
+    // List/Thumbnails
+    var viewmodeCls = 'photo-opt-item' + (photoOptionsIndex === idx ? ' photo-opt-item-selected' : '');
+    html += '<div class="' + viewmodeCls + '" data-index="' + idx + '">' +
+      '<span class="photo-opt-name">List/Thumbnails</span>' +
+      '<span class="photo-opt-arrow">&#10095;</span>' +
+    '</div>';
+    idx++;
+
+    // Shuffle
+    var shuffleCls = 'photo-opt-item' + (photoOptionsIndex === idx ? ' photo-opt-item-selected' : '');
+    html += '<div class="' + shuffleCls + '" data-index="' + idx + '">' +
+      '<span class="photo-opt-name">Shuffle</span>' +
+      shuffleToggle +
+    '</div>';
+    idx++;
+
+    // Repeat
+    var repeatCls = 'photo-opt-item' + (photoOptionsIndex === idx ? ' photo-opt-item-selected' : '');
+    html += '<div class="' + repeatCls + '" data-index="' + idx + '">' +
+      '<span class="photo-opt-name">Repeat</span>' +
+      '<span class="photo-opt-arrow">&#10095;</span>' +
+    '</div>';
+    idx++;
+
+    // Slide show speed
+    var speedCls = 'photo-opt-item' + (photoOptionsIndex === idx ? ' photo-opt-item-selected' : '');
+    html += '<div class="' + speedCls + '" data-index="' + idx + '">' +
+      '<span class="photo-opt-name">Slide show speed</span>' +
+      '<span class="photo-opt-arrow">&#10095;</span>' +
+    '</div>';
+    idx++;
+
+    // Info (only for photo files)
+    if (hasInfo) {
+      var infoCls = 'photo-opt-item' + (photoOptionsIndex === idx ? ' photo-opt-item-selected' : '');
+      html += '<div class="' + infoCls + '" data-index="' + idx + '">' +
+        '<span class="photo-opt-name">Info</span>' +
+      '</div>';
+    }
+
+    html += '</div></div>';
+
+    photoOptionsEl.innerHTML = html;
+  }
+
+  function getPhotoOptionsMaxIndex() {
+    var hasSlideshow = !photoOptionsFromLeftPanel && folderEntries.length > 0 &&
+                       selectedFolderIndex < folderEntries.length &&
+                       !folderEntries[selectedFolderIndex].isDirectory &&
+                       isPhotoFile(folderEntries[selectedFolderIndex].name);
+    // Base items: List/Thumbnails, Shuffle, Repeat, Slide show speed = 4
+    // If hasSlideshow: +1 for Slideshow, +1 for Info = 6 total
+    // If folder/left panel: 4 total
+    if (hasSlideshow) {
+      return 5; // 0-5: slideshow, viewmode, shuffle, repeat, speed, info
+    }
+    return 3; // 0-3: viewmode, shuffle, repeat, speed
+  }
+
+  function getPhotoOptionItem(index) {
+    var hasSlideshow = !photoOptionsFromLeftPanel && folderEntries.length > 0 &&
+                       selectedFolderIndex < folderEntries.length &&
+                       !folderEntries[selectedFolderIndex].isDirectory &&
+                       isPhotoFile(folderEntries[selectedFolderIndex].name);
+
+    if (hasSlideshow) {
+      var items = ['slideshow', 'viewmode', 'shuffle', 'repeat', 'speed', 'info'];
+      return items[index] || '';
+    } else {
+      var items = ['viewmode', 'shuffle', 'repeat', 'speed'];
+      return items[index] || '';
+    }
+  }
+
+  function handlePhotoOptionsOK() {
+    var item = getPhotoOptionItem(photoOptionsIndex);
+    switch (item) {
+      case 'slideshow':
+        closePhotoOptions();
+        playAllPhotosFromOptions();
+        break;
+      case 'viewmode':
+        openPhotoViewmodeSubmenu();
+        break;
+      case 'shuffle':
+        photoShuffleOn = !photoShuffleOn;
+        renderPhotoOptions();
+        break;
+      case 'repeat':
+        openPhotoRepeatSubmenu();
+        break;
+      case 'speed':
+        openPhotoSlidespeedSubmenu();
+        break;
+      case 'info':
+        closePhotoOptions();
+        showPhotoInfo();
+        break;
+    }
+  }
+
+  function handlePhotoOptionsRight() {
+    var item = getPhotoOptionItem(photoOptionsIndex);
+    if (item === 'viewmode' || item === 'repeat' || item === 'speed') {
+      handlePhotoOptionsOK();
+    }
+  }
+
+  // Photo Viewmode submenu
+  function openPhotoViewmodeSubmenu() {
+    photoViewmodeSubmenuIndex = (photoViewMode === 'thumbnails') ? 0 : 1;
+    currentView = 'photo-viewmode-submenu';
+    render();
+  }
+
+  function closePhotoViewmodeSubmenu() {
+    currentView = 'photo-options';
+    render();
+  }
+
+  function renderPhotoViewmodeSubmenu() {
+    if (!photoViewmodeSubmenuEl) return;
+
+    var thumbCls = 'photo-submenu-item' + (photoViewmodeSubmenuIndex === 0 ? ' photo-submenu-item-selected' : '');
+    var listCls = 'photo-submenu-item' + (photoViewmodeSubmenuIndex === 1 ? ' photo-submenu-item-selected' : '');
+
+    var thumbCheck = (photoViewMode === 'thumbnails') ? '<span class="photo-submenu-check">&#10003;</span>' : '';
+    var listCheck = (photoViewMode === 'list') ? '<span class="photo-submenu-check">&#10003;</span>' : '';
+
+    var html = '<div class="photo-submenu-dialog">' +
+      '<div class="photo-submenu-header">' +
+        '<span class="photo-submenu-title">List/Thumbnails</span>' +
+      '</div>' +
+      '<div class="photo-submenu-list">' +
+        '<div class="' + thumbCls + '" data-index="0">' +
+          '<span class="photo-submenu-name">Thumbnails</span>' +
+          thumbCheck +
+        '</div>' +
+        '<div class="' + listCls + '" data-index="1">' +
+          '<span class="photo-submenu-name">List</span>' +
+          listCheck +
+        '</div>' +
+      '</div>' +
+    '</div>';
+
+    photoViewmodeSubmenuEl.innerHTML = html;
+  }
+
+  function confirmPhotoViewmode() {
+    photoViewMode = (photoViewmodeSubmenuIndex === 0) ? 'thumbnails' : 'list';
+    renderPhotoViewmodeSubmenu();
+  }
+
+  // Photo Repeat submenu
+  function openPhotoRepeatSubmenu() {
+    photoRepeatSubmenuIndex = (photoRepeatMode === 'play-once') ? 0 : 1;
+    currentView = 'photo-repeat-submenu';
+    render();
+  }
+
+  function closePhotoRepeatSubmenu() {
+    currentView = 'photo-options';
+    render();
+  }
+
+  function renderPhotoRepeatSubmenu() {
+    if (!photoRepeatSubmenuEl) return;
+
+    var playOnceCls = 'photo-submenu-item' + (photoRepeatSubmenuIndex === 0 ? ' photo-submenu-item-selected' : '');
+    var repeatCls = 'photo-submenu-item' + (photoRepeatSubmenuIndex === 1 ? ' photo-submenu-item-selected' : '');
+
+    var playOnceCheck = (photoRepeatMode === 'play-once') ? '<span class="photo-submenu-check">&#10003;</span>' : '';
+    var repeatCheck = (photoRepeatMode === 'repeat') ? '<span class="photo-submenu-check">&#10003;</span>' : '';
+
+    var html = '<div class="photo-submenu-dialog">' +
+      '<div class="photo-submenu-header">' +
+        '<span class="photo-submenu-title">Repeat</span>' +
+      '</div>' +
+      '<div class="photo-submenu-list">' +
+        '<div class="' + playOnceCls + '" data-index="0">' +
+          '<span class="photo-submenu-name">Repeat once</span>' +
+          playOnceCheck +
+        '</div>' +
+        '<div class="' + repeatCls + '" data-index="1">' +
+          '<span class="photo-submenu-name">Repeat</span>' +
+          repeatCheck +
+        '</div>' +
+      '</div>' +
+    '</div>';
+
+    photoRepeatSubmenuEl.innerHTML = html;
+  }
+
+  function confirmPhotoRepeat() {
+    photoRepeatMode = (photoRepeatSubmenuIndex === 0) ? 'play-once' : 'repeat';
+    renderPhotoRepeatSubmenu();
+  }
+
+  // Photo Slide speed submenu
+  function openPhotoSlidespeedSubmenu() {
+    if (photoSlideSpeed === 'fast') photoSlidespeedSubmenuIndex = 0;
+    else if (photoSlideSpeed === 'medium') photoSlidespeedSubmenuIndex = 1;
+    else photoSlidespeedSubmenuIndex = 2;
+    currentView = 'photo-slidespeed-submenu';
+    render();
+  }
+
+  function closePhotoSlidespeedSubmenu() {
+    currentView = 'photo-options';
+    render();
+  }
+
+  function renderPhotoSlidespeedSubmenu() {
+    if (!photoSlidespeedSubmenuEl) return;
+
+    var fastCls = 'photo-submenu-item' + (photoSlidespeedSubmenuIndex === 0 ? ' photo-submenu-item-selected' : '');
+    var mediumCls = 'photo-submenu-item' + (photoSlidespeedSubmenuIndex === 1 ? ' photo-submenu-item-selected' : '');
+    var slowCls = 'photo-submenu-item' + (photoSlidespeedSubmenuIndex === 2 ? ' photo-submenu-item-selected' : '');
+
+    var fastCheck = (photoSlideSpeed === 'fast') ? '<span class="photo-submenu-check">&#10003;</span>' : '';
+    var mediumCheck = (photoSlideSpeed === 'medium') ? '<span class="photo-submenu-check">&#10003;</span>' : '';
+    var slowCheck = (photoSlideSpeed === 'slow') ? '<span class="photo-submenu-check">&#10003;</span>' : '';
+
+    var html = '<div class="photo-submenu-dialog">' +
+      '<div class="photo-submenu-header">' +
+        '<span class="photo-submenu-title">Slide show speed</span>' +
+      '</div>' +
+      '<div class="photo-submenu-list">' +
+        '<div class="' + fastCls + '" data-index="0">' +
+          '<span class="photo-submenu-name">Fast</span>' +
+          fastCheck +
+        '</div>' +
+        '<div class="' + mediumCls + '" data-index="1">' +
+          '<span class="photo-submenu-name">Medium</span>' +
+          mediumCheck +
+        '</div>' +
+        '<div class="' + slowCls + '" data-index="2">' +
+          '<span class="photo-submenu-name">Slow</span>' +
+          slowCheck +
+        '</div>' +
+      '</div>' +
+    '</div>';
+
+    photoSlidespeedSubmenuEl.innerHTML = html;
+  }
+
+  function confirmPhotoSlidespeed() {
+    if (photoSlidespeedSubmenuIndex === 0) photoSlideSpeed = 'fast';
+    else if (photoSlidespeedSubmenuIndex === 1) photoSlideSpeed = 'medium';
+    else photoSlideSpeed = 'slow';
+    renderPhotoSlidespeedSubmenu();
+  }
+
+  // Photo Info
+  function showPhotoInfo() {
+    if (activePanel !== 'right') return false;
+    if (folderEntries.length === 0) return false;
+
+    var entry = folderEntries[selectedFolderIndex];
+    if (entry.isDirectory) return false;
+
+    var cat = CATEGORIES[selectedCategoryIndex];
+    if (cat.id !== 'photo' || !isPhotoFile(entry.name)) return false;
+
+    currentView = 'photo-info';
+    render();
+    return true;
+  }
+
+  function closePhotoInfo() {
+    currentView = 'split';
+    render();
+  }
+
+  function renderPhotoInfo() {
+    if (!photoInfoEl) return;
+    var entry = folderEntries[selectedFolderIndex];
+    if (!entry) return;
+
+    var dateStr = generateMockDate();
+    var dimensionsStr = generateMockDimensions();
+    var sizeStr = generateMockFileSize();
+
+    var html = '<div class="photo-info-dialog">' +
+      '<div class="photo-info-title">Picture metadata</div>' +
+      '<div class="photo-info-content">' +
+        '<div class="photo-info-row"><span class="photo-info-label">Title:</span> ' + escapeHtml(entry.name) + '</div>' +
+        '<div class="photo-info-row"><span class="photo-info-label">Date:</span> ' + dateStr + '</div>' +
+        '<div class="photo-info-row"><span class="photo-info-label">Size:</span> ' + dimensionsStr + '</div>' +
+        '<div class="photo-info-row"><span class="photo-info-label">File size:</span> ' + sizeStr + '</div>' +
+      '</div>' +
+      '<button class="photo-info-close">Close</button>' +
+    '</div>';
+
+    photoInfoEl.innerHTML = html;
+  }
+
+  // Photo Player
+  function playAllPhotosFromOptions() {
+    buildPlayablePhotoList();
+    if (playableFiles.length === 0) return;
+
+    var startEntry;
+    if (photoShuffleOn) {
+      var startIndex = Math.floor(Math.random() * playableFiles.length);
+      startEntry = playableFiles[startIndex];
+    } else {
+      startEntry = playableFiles[0];
+    }
+    openPhotoPlayer(startEntry, true);
+  }
+
+  function buildPlayablePhotoList() {
+    playableFiles = [];
+    for (var i = 0; i < folderEntries.length; i++) {
+      var entry = folderEntries[i];
+      if (!entry.isDirectory && isPhotoFile(entry.name)) {
+        playableFiles.push(entry);
+      }
+    }
+  }
+
+  function openPhotoPlayer(entry, fromSlideshow) {
+    photoPlayerFromSlideshow = fromSlideshow || false;
+    photoPlayerReturnToIndex = selectedFolderIndex;
+    photoPlayerControlIndex = 0;
+    photoPlayerPlayedIndices = [];
+
+    // Sync options state
+    if (fromSlideshow) {
+      photoPlayerPlayAllOn = true;
+    } else {
+      photoPlayerPlayAllOn = false;
+    }
+    photoPlayerShuffleOn = photoShuffleOn;
+    photoPlayerRepeatOn = (photoRepeatMode === 'repeat');
+    photoPlayerSlideSpeed = photoSlideSpeed;
+
+    buildPlayablePhotoList();
+    currentPlayingIndex = -1;
+    for (var i = 0; i < playableFiles.length; i++) {
+      if (playableFiles[i].name === entry.name) {
+        currentPlayingIndex = i;
+        break;
+      }
+    }
+    if (currentPlayingIndex === -1 && playableFiles.length > 0) {
+      currentPlayingIndex = 0;
+    }
+    currentPlayingFile = entry;
+    currentView = 'photo-player';
+    startPhotoPlayerTimer();
+    render();
+  }
+
+  function closePhotoPlayer() {
+    stopPlaybackTimer();
+
+    // Find and select the last played file in the list
+    if (currentPlayingIndex >= 0 && currentPlayingIndex < playableFiles.length) {
+      var lastPlayedFile = playableFiles[currentPlayingIndex];
+      for (var i = 0; i < folderEntries.length; i++) {
+        if (folderEntries[i].name === lastPlayedFile.name) {
+          selectedFolderIndex = i;
+          break;
+        }
+      }
+    } else {
+      selectedFolderIndex = photoPlayerReturnToIndex;
+    }
+
+    currentPlayingFile = null;
+    currentPlayingIndex = -1;
+    playbackElapsed = 0;
+    playbackDuration = 0;
+    isPaused = false;
+    photoPlayerPlayAllOn = false;
+
+    updateScrollOffset();
+    currentView = 'split';
+    render();
+  }
+
+  function startPhotoPlayerTimer() {
+    stopPlaybackTimer();
+    if (!currentPlayingFile) return;
+
+    playbackDuration = SLIDE_SPEED_SECONDS[photoPlayerSlideSpeed] || 4;
+    playbackElapsed = 0;
+    isPaused = false;
+
+    playbackTimer = setInterval(function() {
+      if (!isPaused) {
+        playbackElapsed++;
+        if (playbackElapsed >= playbackDuration) {
+          onPhotoPlayerComplete();
+          return;
+        }
+      }
+      if (currentView === 'photo-player' || currentView === 'photo-slidespeed-menu') {
+        renderPhotoPlayer();
+      }
+    }, 1000);
+  }
+
+  function onPhotoPlayerComplete() {
+    stopPlaybackTimer();
+
+    // Case 1: No slideshow (Play all), no Repeat
+    if (!photoPlayerPlayAllOn && !photoPlayerRepeatOn) {
+      closePhotoPlayer();
+      return;
+    }
+
+    // Case 2: Only Repeat (no Play all)
+    if (!photoPlayerPlayAllOn && photoPlayerRepeatOn) {
+      playbackElapsed = 0;
+      startPhotoPlayerTimer();
+      return;
+    }
+
+    // Case 3: Play all (slideshow)
+    if (photoPlayerPlayAllOn) {
+      if (photoPlayerPlayedIndices.indexOf(currentPlayingIndex) === -1) {
+        photoPlayerPlayedIndices.push(currentPlayingIndex);
+      }
+
+      var nextIndex = -1;
+
+      if (photoPlayerShuffleOn) {
+        var unplayedIndices = [];
+        for (var i = 0; i < playableFiles.length; i++) {
+          if (photoPlayerPlayedIndices.indexOf(i) === -1) {
+            unplayedIndices.push(i);
+          }
+        }
+
+        if (unplayedIndices.length > 0) {
+          var randomIdx = Math.floor(Math.random() * unplayedIndices.length);
+          nextIndex = unplayedIndices[randomIdx];
+        } else {
+          if (photoPlayerRepeatOn) {
+            photoPlayerPlayedIndices = [];
+            var randomIdx = Math.floor(Math.random() * playableFiles.length);
+            nextIndex = randomIdx;
+          } else {
+            closePhotoPlayer();
+            return;
+          }
+        }
+      } else {
+        nextIndex = currentPlayingIndex + 1;
+
+        if (nextIndex >= playableFiles.length) {
+          if (photoPlayerRepeatOn) {
+            photoPlayerPlayedIndices = [];
+            nextIndex = 0;
+          } else {
+            closePhotoPlayer();
+            return;
+          }
+        }
+      }
+
+      if (nextIndex >= 0) {
+        playPhotoAtIndex(nextIndex);
+      }
+    }
+  }
+
+  function playPhotoAtIndex(index) {
+    if (index >= 0 && index < playableFiles.length) {
+      stopPlaybackTimer();
+      currentPlayingIndex = index;
+      currentPlayingFile = playableFiles[index];
+      photoPlayerReturnToIndex = findFolderEntryIndex(currentPlayingFile.name);
+      startPhotoPlayerTimer();
+      renderPhotoPlayer();
+    }
+  }
+
+  function getPhotoPlayerIcon(type, isHighlight) {
+    var color = isHighlight ? '#fff' : '#8a94a6';
+    switch (type) {
+      case 'play':
+        return '<svg viewBox="0 0 40 40" width="80" height="80"><polygon points="12,8 32,20 12,32" fill="' + color + '"/></svg>';
+      case 'pause':
+        return '<svg viewBox="0 0 40 40" width="80" height="80"><rect x="10" y="8" width="7" height="24" fill="' + color + '"/><rect x="23" y="8" width="7" height="24" fill="' + color + '"/></svg>';
+      case 'prev':
+        return '<svg viewBox="0 0 40 40" width="80" height="80"><rect x="6" y="8" width="4" height="24" fill="' + color + '"/><polygon points="34,8 34,32 14,20" fill="' + color + '"/></svg>';
+      case 'next':
+        return '<svg viewBox="0 0 40 40" width="80" height="80"><polygon points="6,8 26,20 6,32" fill="' + color + '"/><rect x="30" y="8" width="4" height="24" fill="' + color + '"/></svg>';
+      case 'slideshow':
+        return '<svg viewBox="0 0 40 40" width="80" height="80"><circle cx="20" cy="20" r="14" fill="none" stroke="' + color + '" stroke-width="3"/><polygon points="16,12 16,28 28,20" fill="' + color + '"/></svg>';
+      case 'shuffle':
+        return '<svg viewBox="0 0 40 40" width="80" height="80"><path d="M6,12 L20,12 L26,28 L34,28 M6,28 L20,28 L26,12 L34,12" fill="none" stroke="' + color + '" stroke-width="3" stroke-linecap="round"/><polyline points="30,8 34,12 30,16" fill="none" stroke="' + color + '" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/><polyline points="30,24 34,28 30,32" fill="none" stroke="' + color + '" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+      case 'repeat':
+        return '<svg viewBox="0 0 40 40" width="80" height="80"><path d="M8,14 L8,26 Q8,30 12,30 L28,30 Q32,30 32,26 L32,14 Q32,10 28,10 L12,10" fill="none" stroke="' + color + '" stroke-width="3" stroke-linecap="round"/><polyline points="16,6 12,10 16,14" fill="none" stroke="' + color + '" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+      case 'clock':
+        return '<svg viewBox="0 0 40 40" width="80" height="80"><circle cx="20" cy="20" r="14" fill="none" stroke="' + color + '" stroke-width="3"/><line x1="20" y1="20" x2="20" y2="12" stroke="' + color + '" stroke-width="3" stroke-linecap="round"/><line x1="20" y1="20" x2="26" y2="20" stroke="' + color + '" stroke-width="3" stroke-linecap="round"/></svg>';
+      default:
+        return '';
+    }
+  }
+
+  function renderPhotoPlayer() {
+    if (!photoPlayerEl || !currentPlayingFile) return;
+
+    // Build control icons
+    var playPauseIcon = isPaused ? getPhotoPlayerIcon('play', true) : getPhotoPlayerIcon('pause', true);
+
+    var controls = [
+      { id: 'playpause', content: playPauseIcon, highlight: true },
+      { id: 'prev', content: getPhotoPlayerIcon('prev', true), highlight: true },
+      { id: 'next', content: getPhotoPlayerIcon('next', true), highlight: true },
+      { id: 'slideshow', content: getPhotoPlayerIcon('slideshow', photoPlayerPlayAllOn), highlight: photoPlayerPlayAllOn },
+      { id: 'shuffle', content: getPhotoPlayerIcon('shuffle', photoPlayerShuffleOn), highlight: photoPlayerShuffleOn },
+      { id: 'repeat', content: getPhotoPlayerIcon('repeat', photoPlayerRepeatOn), highlight: photoPlayerRepeatOn },
+      { id: 'clock', content: getPhotoPlayerIcon('clock', true), highlight: true }
+    ];
+
+    var controlsHtml = '';
+    for (var i = 0; i < controls.length; i++) {
+      var ctrl = controls[i];
+      var isSelected = (photoPlayerControlIndex === i);
+      var cls = 'pp-ctrl-btn' + (isSelected ? ' pp-ctrl-selected' : '') + (ctrl.highlight ? ' pp-ctrl-on' : ' pp-ctrl-off');
+      controlsHtml += '<div class="' + cls + '" data-index="' + i + '">' + ctrl.content + '</div>';
+    }
+
+    // Photo info
+    var entry = currentPlayingFile;
+    var dimensionsStr = generateMockDimensions();
+    var dateStr = generateMockDate();
+    var sizeStr = generateMockFileSize();
+    var infoLine = dimensionsStr + ' | ' + dateStr + ' | ' + sizeStr;
+
+    // Dynamic background
+    var bgStyle = 'background:#1a1a1a url("' + getPhotoBackground(currentPlayingIndex) + '") center/cover no-repeat';
+
+    photoPlayerEl.innerHTML =
+      '<div class="pp-bg" style="' + bgStyle + '"></div>' +
+      '<div class="pp-hud">' +
+        '<div class="pp-info">' +
+          '<div class="pp-filename">' + escapeHtml(entry.name) + '</div>' +
+          '<div class="pp-meta">' + escapeHtml(infoLine) + '</div>' +
+          '<div class="pp-controls">' + controlsHtml + '</div>' +
+        '</div>' +
+        '<div class="pp-right">' +
+          '<span class="pp-counter">' + (currentPlayingIndex + 1) + '/' + playableFiles.length + '</span>' +
+        '</div>' +
+      '</div>';
+  }
+
+  function handlePhotoPlayerNav(act) {
+    switch (act) {
+      case 'LEFT':
+        if (photoPlayerControlIndex > 0) {
+          photoPlayerControlIndex--;
+          renderPhotoPlayer();
+        }
+        return true;
+      case 'RIGHT':
+        if (photoPlayerControlIndex < 6) {
+          photoPlayerControlIndex++;
+          renderPhotoPlayer();
+        }
+        return true;
+      case 'OK':
+        handlePhotoPlayerOK();
+        return true;
+      case 'PLAY':
+        // When paused, resume
+        if (isPaused) {
+          isPaused = false;
+          renderPhotoPlayer();
+        }
+        return true;
+      case 'PAUSE':
+        // When playing, pause
+        if (!isPaused) {
+          isPaused = true;
+          renderPhotoPlayer();
+        }
+        return true;
+      case 'BACK':
+        closePhotoPlayer();
+        return true;
+      case 'INFO':
+        // Show photo info in player
+        return true;
+      default:
+        return false;
+    }
+  }
+
+  function handlePhotoPlayerOK() {
+    switch (photoPlayerControlIndex) {
+      case 0: // Play/Pause
+        isPaused = !isPaused;
+        break;
+      case 1: // Previous
+        if (playableFiles.length > 0) {
+          var prevIndex = (currentPlayingIndex - 1 + playableFiles.length) % playableFiles.length;
+          playPhotoAtIndex(prevIndex);
+        }
+        return;
+      case 2: // Next
+        if (playableFiles.length > 0) {
+          var nextIndex = (currentPlayingIndex + 1) % playableFiles.length;
+          playPhotoAtIndex(nextIndex);
+        }
+        return;
+      case 3: // Slide show (Play All)
+        photoPlayerPlayAllOn = !photoPlayerPlayAllOn;
+        photoPlayerPlayedIndices = [];
+        break;
+      case 4: // Shuffle
+        photoPlayerShuffleOn = !photoPlayerShuffleOn;
+        photoShuffleOn = photoPlayerShuffleOn;
+        photoPlayerPlayedIndices = [];
+        break;
+      case 5: // Repeat
+        photoPlayerRepeatOn = !photoPlayerRepeatOn;
+        photoRepeatMode = photoPlayerRepeatOn ? 'repeat' : 'play-once';
+        break;
+      case 6: // Clock (slide speed)
+        openPhotoSlidespeedMenu();
+        return;
+    }
+    renderPhotoPlayer();
+  }
+
+  // Photo slide speed menu (in player, similar to Info popup)
+  function openPhotoSlidespeedMenu() {
+    if (photoPlayerSlideSpeed === 'fast') photoSlidespeedMenuIndex = 0;
+    else if (photoPlayerSlideSpeed === 'medium') photoSlidespeedMenuIndex = 1;
+    else photoSlidespeedMenuIndex = 2;
+    currentView = 'photo-slidespeed-menu';
+    render();
+  }
+
+  function closePhotoSlidespeedMenu() {
+    currentView = 'photo-player';
+    render();
+  }
+
+  function renderPhotoSlidespeedMenu() {
+    if (!photoSlidespeedMenuEl) return;
+
+    var fastCls = 'pp-speed-item' + (photoSlidespeedMenuIndex === 0 ? ' pp-speed-item-selected' : '');
+    var mediumCls = 'pp-speed-item' + (photoSlidespeedMenuIndex === 1 ? ' pp-speed-item-selected' : '');
+    var slowCls = 'pp-speed-item' + (photoSlidespeedMenuIndex === 2 ? ' pp-speed-item-selected' : '');
+
+    var fastCheck = (photoPlayerSlideSpeed === 'fast') ? '<span class="pp-speed-check">&#10003;</span>' : '';
+    var mediumCheck = (photoPlayerSlideSpeed === 'medium') ? '<span class="pp-speed-check">&#10003;</span>' : '';
+    var slowCheck = (photoPlayerSlideSpeed === 'slow') ? '<span class="pp-speed-check">&#10003;</span>' : '';
+
+    var html = '<div class="pp-speed-dialog">' +
+      '<div class="pp-speed-header">' +
+        '<span class="pp-speed-title">Slide show speed</span>' +
+      '</div>' +
+      '<div class="pp-speed-list">' +
+        '<div class="' + fastCls + '" data-index="0">' +
+          '<span class="pp-speed-name">Fast</span>' +
+          fastCheck +
+        '</div>' +
+        '<div class="' + mediumCls + '" data-index="1">' +
+          '<span class="pp-speed-name">Medium</span>' +
+          mediumCheck +
+        '</div>' +
+        '<div class="' + slowCls + '" data-index="2">' +
+          '<span class="pp-speed-name">Slow</span>' +
+          slowCheck +
+        '</div>' +
+      '</div>' +
+    '</div>';
+
+    photoSlidespeedMenuEl.innerHTML = html;
+  }
+
+  function confirmPhotoSlidespeedMenu() {
+    if (photoSlidespeedMenuIndex === 0) photoPlayerSlideSpeed = 'fast';
+    else if (photoSlidespeedMenuIndex === 1) photoPlayerSlideSpeed = 'medium';
+    else photoPlayerSlideSpeed = 'slow';
+
+    // Sync back to options
+    photoSlideSpeed = photoPlayerSlideSpeed;
+
+    // Update timer with new speed
+    playbackDuration = SLIDE_SPEED_SECONDS[photoPlayerSlideSpeed] || 4;
+    if (playbackElapsed >= playbackDuration) {
+      playbackElapsed = playbackDuration - 1;
+    }
+
+    renderPhotoSlidespeedMenu();
+  }
+
+  function isPhotoCategory() {
+    return CATEGORIES[selectedCategoryIndex].id === 'photo';
   }
 
   function handleMusicPlayerNav(act) {
@@ -2046,6 +2876,8 @@
         } else if (isPlayableFile(entry.name)) {
           if (isMusicFile(entry.name)) {
             openMusicPlayer(entry, false);
+          } else if (isPhotoFile(entry.name)) {
+            openPhotoPlayer(entry, false);
           } else {
             playFile(entry);
           }
@@ -2293,6 +3125,156 @@
       return handleMusicPlayerNav(act);
     }
 
+    // Handle photo-options view
+    if (currentView === 'photo-options') {
+      var maxIdx = getPhotoOptionsMaxIndex();
+      switch (act) {
+        case 'UP':
+          if (photoOptionsIndex > 0) {
+            photoOptionsIndex--;
+            renderPhotoOptions();
+          }
+          return true;
+        case 'DOWN':
+          if (photoOptionsIndex < maxIdx) {
+            photoOptionsIndex++;
+            renderPhotoOptions();
+          }
+          return true;
+        case 'OK':
+          handlePhotoOptionsOK();
+          return true;
+        case 'RIGHT':
+          handlePhotoOptionsRight();
+          return true;
+        case 'BACK':
+        case 'OPTION':
+          closePhotoOptions();
+          return true;
+      }
+      return false;
+    }
+
+    // Handle photo-viewmode-submenu view
+    if (currentView === 'photo-viewmode-submenu') {
+      switch (act) {
+        case 'UP':
+          if (photoViewmodeSubmenuIndex > 0) {
+            photoViewmodeSubmenuIndex--;
+            renderPhotoViewmodeSubmenu();
+          }
+          return true;
+        case 'DOWN':
+          if (photoViewmodeSubmenuIndex < 1) {
+            photoViewmodeSubmenuIndex++;
+            renderPhotoViewmodeSubmenu();
+          }
+          return true;
+        case 'OK':
+          confirmPhotoViewmode();
+          return true;
+        case 'LEFT':
+        case 'BACK':
+          closePhotoViewmodeSubmenu();
+          return true;
+      }
+      return false;
+    }
+
+    // Handle photo-repeat-submenu view
+    if (currentView === 'photo-repeat-submenu') {
+      switch (act) {
+        case 'UP':
+          if (photoRepeatSubmenuIndex > 0) {
+            photoRepeatSubmenuIndex--;
+            renderPhotoRepeatSubmenu();
+          }
+          return true;
+        case 'DOWN':
+          if (photoRepeatSubmenuIndex < 1) {
+            photoRepeatSubmenuIndex++;
+            renderPhotoRepeatSubmenu();
+          }
+          return true;
+        case 'OK':
+          confirmPhotoRepeat();
+          return true;
+        case 'LEFT':
+        case 'BACK':
+          closePhotoRepeatSubmenu();
+          return true;
+      }
+      return false;
+    }
+
+    // Handle photo-slidespeed-submenu view
+    if (currentView === 'photo-slidespeed-submenu') {
+      switch (act) {
+        case 'UP':
+          if (photoSlidespeedSubmenuIndex > 0) {
+            photoSlidespeedSubmenuIndex--;
+            renderPhotoSlidespeedSubmenu();
+          }
+          return true;
+        case 'DOWN':
+          if (photoSlidespeedSubmenuIndex < 2) {
+            photoSlidespeedSubmenuIndex++;
+            renderPhotoSlidespeedSubmenu();
+          }
+          return true;
+        case 'OK':
+          confirmPhotoSlidespeed();
+          return true;
+        case 'LEFT':
+        case 'BACK':
+          closePhotoSlidespeedSubmenu();
+          return true;
+      }
+      return false;
+    }
+
+    // Handle photo-info view
+    if (currentView === 'photo-info') {
+      switch (act) {
+        case 'OK':
+        case 'BACK':
+        case 'INFO':
+          closePhotoInfo();
+          return true;
+      }
+      return false;
+    }
+
+    // Handle photo-player view
+    if (currentView === 'photo-player') {
+      return handlePhotoPlayerNav(act);
+    }
+
+    // Handle photo-slidespeed-menu view (in player)
+    if (currentView === 'photo-slidespeed-menu') {
+      switch (act) {
+        case 'UP':
+          if (photoSlidespeedMenuIndex > 0) {
+            photoSlidespeedMenuIndex--;
+            renderPhotoSlidespeedMenu();
+          }
+          return true;
+        case 'DOWN':
+          if (photoSlidespeedMenuIndex < 2) {
+            photoSlidespeedMenuIndex++;
+            renderPhotoSlidespeedMenu();
+          }
+          return true;
+        case 'OK':
+          confirmPhotoSlidespeedMenu();
+          return true;
+        case 'BACK':
+          closePhotoSlidespeedMenu();
+          return true;
+      }
+      return false;
+    }
+
     // Handle split/devices views
     switch (act) {
       case 'UP':
@@ -2317,6 +3299,8 @@
           if (!entry.isDirectory && isPlayableFile(entry.name)) {
             if (isMusicFile(entry.name)) {
               openMusicPlayer(entry, false);
+            } else if (isPhotoFile(entry.name)) {
+              openPhotoPlayer(entry, false);
             } else {
               playFile(entry);
             }
@@ -2333,6 +3317,18 @@
             var entry = folderEntries[selectedFolderIndex];
             if (!entry.isDirectory && isMusicFile(entry.name)) {
               return openMusicOptions(false);
+            }
+          }
+        }
+        // Option key in Photo category opens photo options
+        if (isPhotoCategory()) {
+          if (activePanel === 'left') {
+            return openPhotoOptions(true);
+          } else if (activePanel === 'right' && folderEntries.length > 0) {
+            var entry = folderEntries[selectedFolderIndex];
+            // Open photo options for folders or photo files
+            if (entry.isDirectory || isPhotoFile(entry.name)) {
+              return openPhotoOptions(entry.isDirectory);
             }
           }
         }
@@ -2579,6 +3575,86 @@
         '.mp-ctrl-btn.mp-ctrl-selected{background:#3182ce;border-color:#fff}' +
         '.mp-ctrl-btn.mp-ctrl-off svg{opacity:.5}' +
         '.mp-fast-speed{color:#fff;font-size:2.4rem;font-weight:700}' +
+        // Photo Options dialog styles (matching Music Options style)
+        '.photo-options{position:absolute;inset:0;display:none;align-items:flex-start;justify-content:flex-start;' +
+          'background:rgba(0,0,0,.5);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);padding-top:80px;padding-left:60px}' +
+        '.photo-opt-dialog{background:#4a5568;border:3px solid #718096;border-radius:16px;min-width:420px;' +
+          'padding:32px 48px;box-shadow:0 12px 60px rgba(0,0,0,.8)}' +
+        '.photo-opt-header{margin-bottom:24px}' +
+        '.photo-opt-title{font-size:2rem;font-weight:600;color:#ffc239;letter-spacing:.5px}' +
+        '.photo-opt-list{display:flex;flex-direction:column;gap:8px}' +
+        '.photo-opt-item{display:flex;align-items:center;padding:18px 24px;color:#e2e8f0;' +
+          'background:#5a6578;border:2px solid #718096;border-radius:12px;cursor:pointer;transition:all .15s}' +
+        '.photo-opt-item:hover{background:#6a7588;border-color:#8a94a6}' +
+        '.photo-opt-item.photo-opt-item-selected{background:#3182ce;color:#fff;border-color:#fff}' +
+        '.photo-opt-name{flex:1;font-size:1.4rem;font-weight:500}' +
+        '.photo-opt-arrow{font-size:1.2rem;color:#a0aec0}' +
+        '.photo-opt-item.photo-opt-item-selected .photo-opt-arrow{color:#fff}' +
+        '.photo-opt-toggle{display:inline-block;width:52px;height:28px;border-radius:14px;position:relative;transition:background .2s}' +
+        '.photo-opt-toggle::after{content:"";position:absolute;top:3px;width:22px;height:22px;border-radius:50%;background:#fff;transition:left .2s}' +
+        '.photo-opt-toggle-off{background:#718096}' +
+        '.photo-opt-toggle-off::after{left:3px}' +
+        '.photo-opt-toggle-on{background:#3a86ff}' +
+        '.photo-opt-toggle-on::after{left:27px}' +
+        // Photo submenu dialog styles (for viewmode, repeat, slidespeed)
+        '.photo-submenu{position:absolute;inset:0;display:none;align-items:flex-start;justify-content:flex-start;' +
+          'background:rgba(0,0,0,.5);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);padding-top:80px;padding-left:60px}' +
+        '.photo-submenu-dialog{background:#4a5568;border:3px solid #718096;border-radius:16px;min-width:420px;' +
+          'padding:32px 48px;box-shadow:0 12px 60px rgba(0,0,0,.8)}' +
+        '.photo-submenu-header{margin-bottom:24px}' +
+        '.photo-submenu-title{font-size:2rem;font-weight:600;color:#ffc239;letter-spacing:.5px}' +
+        '.photo-submenu-list{display:flex;flex-direction:column;gap:8px}' +
+        '.photo-submenu-item{display:flex;align-items:center;padding:18px 24px;color:#e2e8f0;' +
+          'background:#5a6578;border:2px solid #718096;border-radius:12px;cursor:pointer;transition:all .15s}' +
+        '.photo-submenu-item:hover{background:#6a7588;border-color:#8a94a6}' +
+        '.photo-submenu-item.photo-submenu-item-selected{background:#3182ce;color:#fff;border-color:#fff}' +
+        '.photo-submenu-name{flex:1;font-size:1.4rem;font-weight:500}' +
+        '.photo-submenu-check{font-size:1.4rem;color:#e2e8f0}' +
+        '.photo-submenu-item.photo-submenu-item-selected .photo-submenu-check{color:#fff}' +
+        // Photo Info dialog styles
+        '.photo-info{position:absolute;inset:0;display:none;align-items:center;justify-content:center;' +
+          'background:rgba(0,0,0,.7);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}' +
+        '.photo-info-dialog{background:#4a5568;border:3px solid #718096;border-radius:16px;' +
+          'padding:32px 48px;min-width:480px;box-shadow:0 12px 60px rgba(0,0,0,.8)}' +
+        '.photo-info-title{color:#ffc239;font-size:2rem;font-weight:600;margin-bottom:28px}' +
+        '.photo-info-content{margin-bottom:32px}' +
+        '.photo-info-row{color:#e2e8f0;font-size:1.4rem;margin:12px 0;line-height:1.6}' +
+        '.photo-info-label{color:#e2e8f0;font-weight:600}' +
+        '.photo-info-close{display:block;width:100%;background:#3182ce;color:#fff;border:none;' +
+          'border-radius:28px;padding:16px 32px;font-size:1.3rem;font-weight:600;cursor:pointer;transition:background .15s}' +
+        '.photo-info-close:hover{background:#2b6cb0}' +
+        // Photo Player styles
+        '.photo-player-view{position:absolute;inset:0;display:none;flex-direction:column;background:#0d0f14}' +
+        '.pp-bg{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background-size:cover;background-position:center}' +
+        '.pp-hud{position:absolute;bottom:60px;left:80px;right:80px;' +
+          'background:rgba(74,85,104,0.95);border-radius:16px;display:flex;flex-direction:row;' +
+          'padding:24px 32px;gap:32px;box-shadow:0 8px 40px rgba(0,0,0,.6);align-items:center}' +
+        '.pp-info{flex:1;display:flex;flex-direction:column;justify-content:center;gap:12px}' +
+        '.pp-filename{color:#fff;font-size:1.8rem;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}' +
+        '.pp-meta{color:#cbd5e0;font-size:1.2rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}' +
+        '.pp-controls{display:flex;flex-direction:row;align-items:center;justify-content:flex-start;gap:24px;margin-top:8px}' +
+        '.pp-ctrl-btn{width:80px;height:80px;display:flex;align-items:center;justify-content:center;' +
+          'border-radius:12px;cursor:pointer;transition:all .15s;border:3px solid transparent}' +
+        '.pp-ctrl-btn:hover{background:rgba(255,255,255,.1)}' +
+        '.pp-ctrl-btn.pp-ctrl-selected{background:#3182ce;border-color:#fff}' +
+        '.pp-ctrl-btn.pp-ctrl-off svg{opacity:.5}' +
+        '.pp-right{display:flex;align-items:center;gap:16px}' +
+        '.pp-counter{color:#a0aec0;font-size:1.4rem}' +
+        // Photo slide speed menu in player
+        '.photo-slidespeed-menu{position:absolute;inset:0;display:none;align-items:center;justify-content:center;' +
+          'background:rgba(0,0,0,.7);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}' +
+        '.pp-speed-dialog{background:#4a5568;border:3px solid #718096;border-radius:16px;min-width:400px;' +
+          'padding:32px 48px;box-shadow:0 12px 60px rgba(0,0,0,.8)}' +
+        '.pp-speed-header{margin-bottom:24px}' +
+        '.pp-speed-title{font-size:2rem;font-weight:600;color:#ffc239;letter-spacing:.5px}' +
+        '.pp-speed-list{display:flex;flex-direction:column;gap:8px}' +
+        '.pp-speed-item{display:flex;align-items:center;padding:18px 24px;color:#e2e8f0;' +
+          'background:#5a6578;border:2px solid #718096;border-radius:12px;cursor:pointer;transition:all .15s}' +
+        '.pp-speed-item:hover{background:#6a7588;border-color:#8a94a6}' +
+        '.pp-speed-item.pp-speed-item-selected{background:#3182ce;color:#fff;border-color:#fff}' +
+        '.pp-speed-name{flex:1;font-size:1.4rem;font-weight:500}' +
+        '.pp-speed-check{font-size:1.4rem;color:#e2e8f0}' +
+        '.pp-speed-item.pp-speed-item-selected .pp-speed-check{color:#fff}' +
         '</style>' +
         '<div class="usb-root">' +
           '<div class="usb-player">' +
@@ -2602,6 +3678,13 @@
             '<div class="music-options"></div>' +
             '<div class="music-repeat-submenu"></div>' +
             '<div class="music-player-view"></div>' +
+            '<div class="photo-options"></div>' +
+            '<div class="photo-submenu photo-viewmode-submenu"></div>' +
+            '<div class="photo-submenu photo-repeat-submenu"></div>' +
+            '<div class="photo-submenu photo-slidespeed-submenu"></div>' +
+            '<div class="photo-player-view"></div>' +
+            '<div class="photo-info"></div>' +
+            '<div class="photo-slidespeed-menu"></div>' +
           '</div>' +
         '</div>';
       stageEl = el.querySelector('.usb-stage');
@@ -2620,6 +3703,13 @@
       musicOptionsEl = el.querySelector('.music-options');
       musicRepeatSubmenuEl = el.querySelector('.music-repeat-submenu');
       musicPlayerEl = el.querySelector('.music-player-view');
+      photoOptionsEl = el.querySelector('.photo-options');
+      photoViewmodeSubmenuEl = el.querySelector('.photo-viewmode-submenu');
+      photoRepeatSubmenuEl = el.querySelector('.photo-repeat-submenu');
+      photoSlidespeedSubmenuEl = el.querySelector('.photo-slidespeed-submenu');
+      photoPlayerEl = el.querySelector('.photo-player-view');
+      photoInfoEl = el.querySelector('.photo-info');
+      photoSlidespeedMenuEl = el.querySelector('.photo-slidespeed-menu');
     },
 
     onShow: function (params) {
