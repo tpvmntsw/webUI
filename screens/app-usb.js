@@ -38,7 +38,7 @@
 
   var usbDevices = [];
   var selectedDeviceIndex = 0;
-  // 'idle' | 'devices' | 'split' | 'playing' | 'option-menu' | 'video-info' | 'music-options' | 'music-repeat-submenu' | 'music-player' | 'photo-options' | 'photo-viewmode-submenu' | 'photo-repeat-submenu' | 'photo-slidespeed-submenu' | 'photo-player' | 'photo-info' | 'photo-slidespeed-menu'
+  // 'idle' | 'devices' | 'split' | 'playing' | 'option-menu' | 'video-info' | 'music-options' | 'music-repeat-submenu' | 'music-player' | 'photo-options' | 'photo-viewmode-submenu' | 'photo-repeat-submenu' | 'photo-slidespeed-submenu' | 'photo-player' | 'photo-info' | 'photo-slidespeed-menu' | 'photo-player-info'
   var currentView = 'idle';
   var musicPlayerEl = null;
   var photoOptionsEl = null;
@@ -48,6 +48,7 @@
   var photoPlayerEl = null;
   var photoInfoEl = null;
   var photoSlidespeedMenuEl = null;
+  var photoPlayerInfoEl = null;
   var currentDeviceId = null;
   // 'left' | 'right' - which panel is active
   var activePanel = 'left';
@@ -109,6 +110,15 @@
   var photoPlayerFromSlideshow = false;
   var photoPlayerPlayedIndices = [];
   var photoSlidespeedMenuIndex = 0; // for the clock icon menu in player
+
+  // HUD visibility state for Music/Photo players
+  var HUD_AUTO_HIDE_DELAY = 5000; // 5 seconds
+  var musicPlayerHudVisible = true;
+  var musicPlayerHudTimer = null;
+  var musicPlayerHudLocked = false; // true when shown by INFO key (no auto-hide)
+  var photoPlayerHudVisible = true;
+  var photoPlayerHudTimer = null;
+  var photoPlayerHudLocked = false; // true when shown by INFO key (no auto-hide)
 
   // Slide show speed mapping (seconds)
   var SLIDE_SPEED_SECONDS = { fast: 4, medium: 8, slow: 12 };
@@ -227,7 +237,8 @@
       // Underwater scene
       "data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%27400%27 height=%27300%27%3E%3Cdefs%3E%3ClinearGradient id=%27water%27 x1=%270%27 y1=%270%27 x2=%270%27 y2=%271%27%3E%3Cstop offset=%270%25%27 stop-color=%27%2300bcd4%27/%3E%3Cstop offset=%27100%25%27 stop-color=%27%23006064%27/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect fill=%27url(%23water)%27 width=%27400%27 height=%27300%27/%3E%3Cellipse cx=%27100%27 cy=%27100%27 r=%278%27 fill=%27rgba(255,255,255,0.3)%27/%3E%3Cellipse cx=%27300%27 cy=%2760%27 r=%275%27 fill=%27rgba(255,255,255,0.3)%27/%3E%3Cellipse cx=%27200%27 cy=%27150%27 r=%276%27 fill=%27rgba(255,255,255,0.3)%27/%3E%3Cpath d=%27M50 280 Q70 250 90 280 Q110 250 130 280 L130 300 L50 300Z%27 fill=%27%23ff7043%27/%3E%3Cpath d=%27M200 270 Q230 230 260 270 Q290 230 320 270 L320 300 L200 300Z%27 fill=%27%23e91e63%27/%3E%3Cellipse cx=%27250%27 cy=%27120%27 rx=%2730%27 ry=%2715%27 fill=%27%23ffeb3b%27/%3E%3Cpath d=%27M280 120 L300 110 L300 130Z%27 fill=%27%23ffeb3b%27/%3E%3C/svg%3E"
     ];
-    return backgrounds[index % backgrounds.length];
+    var safeIndex = ((index % backgrounds.length) + backgrounds.length) % backgrounds.length;
+    return backgrounds[safeIndex];
   }
 
   // Categories for USB content
@@ -506,7 +517,7 @@
   };
 
   function render() {
-    if (!idleEl || !deviceListEl || !splitViewEl || !playerViewEl || !optionMenuEl || !videoInfoEl || !fullscreenEl || !windowEl || !musicOptionsEl || !musicRepeatSubmenuEl || !musicPlayerEl || !photoOptionsEl || !photoViewmodeSubmenuEl || !photoRepeatSubmenuEl || !photoSlidespeedSubmenuEl || !photoPlayerEl || !photoInfoEl || !photoSlidespeedMenuEl) return;
+    if (!idleEl || !deviceListEl || !splitViewEl || !playerViewEl || !optionMenuEl || !videoInfoEl || !fullscreenEl || !windowEl || !musicOptionsEl || !musicRepeatSubmenuEl || !musicPlayerEl || !photoOptionsEl || !photoViewmodeSubmenuEl || !photoRepeatSubmenuEl || !photoSlidespeedSubmenuEl || !photoPlayerEl || !photoInfoEl || !photoSlidespeedMenuEl || !photoPlayerInfoEl) return;
 
     // Hide all views
     idleEl.style.display = 'none';
@@ -525,6 +536,7 @@
     photoPlayerEl.style.display = 'none';
     photoInfoEl.style.display = 'none';
     photoSlidespeedMenuEl.style.display = 'none';
+    photoPlayerInfoEl.style.display = 'none';
 
     // Determine if we're in fullscreen mode (split/playing/option-menu/video-info/music-options/music-repeat-submenu/music-player/photo-*)
     var isFullscreenView = (currentView === 'split' || currentView === 'playing' ||
@@ -534,7 +546,8 @@
                             currentView === 'photo-options' || currentView === 'photo-viewmode-submenu' ||
                             currentView === 'photo-repeat-submenu' || currentView === 'photo-slidespeed-submenu' ||
                             currentView === 'photo-player' || currentView === 'photo-info' ||
-                            currentView === 'photo-slidespeed-menu');
+                            currentView === 'photo-slidespeed-menu' ||
+                            currentView === 'photo-player-info');
 
     // Toggle between windowed (idle/devices) and fullscreen (split/playing) containers
     windowEl.style.display = isFullscreenView ? 'none' : 'flex';
@@ -630,6 +643,11 @@
       photoSlidespeedMenuEl.style.display = 'flex';
       renderPhotoPlayer();
       renderPhotoSlidespeedMenu();
+    } else if (currentView === 'photo-player-info') {
+      photoPlayerEl.style.display = 'flex';
+      photoPlayerInfoEl.style.display = 'flex';
+      renderPhotoPlayer();
+      renderPhotoPlayerInfo();
     }
   }
 
@@ -1233,6 +1251,126 @@
     return fileInfo;
   }
 
+  // Cache for photo file metadata (so it doesn't regenerate on every render)
+  var photoFileMetaCache = {};
+
+  function getPhotoFileInfo(entry, index) {
+    // Use cached metadata if available
+    if (photoFileMetaCache[entry.name]) {
+      return photoFileMetaCache[entry.name];
+    }
+    // Generate and cache metadata for this file
+    var fileInfo = {
+      filename: entry.name,
+      dimensions: generateMockDimensions(),
+      date: generateMockDate(),
+      size: generateMockFileSize(),
+      bgIndex: index >= 0 ? index : 0
+    };
+    photoFileMetaCache[entry.name] = fileInfo;
+    return fileInfo;
+  }
+
+  // Music Player HUD visibility functions
+  function clearMusicPlayerHudTimer() {
+    if (musicPlayerHudTimer) {
+      clearTimeout(musicPlayerHudTimer);
+      musicPlayerHudTimer = null;
+    }
+  }
+
+  function startMusicPlayerHudTimer() {
+    clearMusicPlayerHudTimer();
+    if (musicPlayerHudLocked) return; // Don't auto-hide if locked by INFO
+    musicPlayerHudTimer = setTimeout(function() {
+      musicPlayerHudVisible = false;
+      musicPlayerHudTimer = null;
+      renderMusicPlayer();
+    }, HUD_AUTO_HIDE_DELAY);
+  }
+
+  function showMusicPlayerHud(locked) {
+    musicPlayerHudVisible = true;
+    musicPlayerHudLocked = locked || false;
+    if (!locked) {
+      startMusicPlayerHudTimer();
+    } else {
+      clearMusicPlayerHudTimer();
+    }
+    renderMusicPlayer();
+  }
+
+  function hideMusicPlayerHud() {
+    clearMusicPlayerHudTimer();
+    musicPlayerHudVisible = false;
+    musicPlayerHudLocked = false;
+    renderMusicPlayer();
+  }
+
+  function toggleMusicPlayerHudByInfo() {
+    if (musicPlayerHudVisible) {
+      hideMusicPlayerHud();
+    } else {
+      showMusicPlayerHud(true); // Show locked (no auto-hide)
+    }
+  }
+
+  function resetMusicPlayerHudOnPlayPause() {
+    // Called when OK/PLAY/PAUSE is pressed
+    musicPlayerHudLocked = false;
+    showMusicPlayerHud(false); // Show with auto-hide
+  }
+
+  // Photo Player HUD visibility functions
+  function clearPhotoPlayerHudTimer() {
+    if (photoPlayerHudTimer) {
+      clearTimeout(photoPlayerHudTimer);
+      photoPlayerHudTimer = null;
+    }
+  }
+
+  function startPhotoPlayerHudTimer() {
+    clearPhotoPlayerHudTimer();
+    if (photoPlayerHudLocked) return; // Don't auto-hide if locked by INFO
+    photoPlayerHudTimer = setTimeout(function() {
+      photoPlayerHudVisible = false;
+      photoPlayerHudTimer = null;
+      renderPhotoPlayer();
+    }, HUD_AUTO_HIDE_DELAY);
+  }
+
+  function showPhotoPlayerHud(locked) {
+    photoPlayerHudVisible = true;
+    photoPlayerHudLocked = locked || false;
+    if (!locked) {
+      startPhotoPlayerHudTimer();
+    } else {
+      clearPhotoPlayerHudTimer();
+    }
+    renderPhotoPlayer();
+  }
+
+  function hidePhotoPlayerHud() {
+    clearPhotoPlayerHudTimer();
+    photoPlayerHudVisible = false;
+    photoPlayerHudLocked = false;
+    renderPhotoPlayer();
+  }
+
+  function togglePhotoPlayerHudByInfo() {
+    if (photoPlayerHudVisible) {
+      hidePhotoPlayerHud();
+    } else {
+      showPhotoPlayerHud(true); // Show locked (no auto-hide)
+    }
+  }
+
+  function resetPhotoPlayerHudOnPlayPause() {
+    // Called when OK/PLAY/PAUSE is pressed
+    photoPlayerHudLocked = false;
+    showPhotoPlayerHud(false); // Show with auto-hide
+  }
+
   function renderMusicPlayer() {
     if (!musicPlayerEl || !currentPlayingFile) return;
 
@@ -1297,33 +1435,40 @@
     var timerSecs = playbackElapsed % 60;
     var timerDisplay = (timerMins < 10 ? '0' : '') + timerMins + ':' + (timerSecs < 10 ? '0' : '') + timerSecs;
 
+    // Build HUD HTML conditionally based on visibility
+    var hudHtml = '';
+    if (musicPlayerHudVisible) {
+      hudHtml =
+        '<div class="mp-hud">' +
+          '<div class="mp-art">' +
+            '<svg viewBox="0 0 180 180" width="180" height="180" xmlns="http://www.w3.org/2000/svg">' +
+              '<rect width="180" height="180" fill="#4a5568" rx="8"/>' +
+              '<text x="90" y="115" text-anchor="middle" font-size="90" fill="#fff">&#9835;</text>' +
+            '</svg>' +
+          '</div>' +
+          '<div class="mp-info">' +
+            '<div class="mp-filename">' + escapeHtml(fileInfo.filename) + '</div>' +
+            '<div class="mp-meta">' + metaLine + '</div>' +
+            '<div class="mp-progress">' +
+              '<div class="mp-progress-bar">' +
+                '<div class="mp-progress-fill" style="width:' + progressPercent + '%"></div>' +
+              '</div>' +
+              '<div class="mp-time">' +
+                '<span>' + formatTimeHMS(playbackElapsed) + '</span>' +
+                '<span> / </span>' +
+                '<span>' + formatTimeHMS(playbackDuration) + '</span>' +
+              '</div>' +
+            '</div>' +
+            '<div class="mp-controls">' + controlsHtml + '</div>' +
+          '</div>' +
+        '</div>';
+    }
+
     musicPlayerEl.innerHTML =
       '<div class="mp-bg">' +
         '<div class="mp-timer">' + timerDisplay + '</div>' +
       '</div>' +
-      '<div class="mp-hud">' +
-        '<div class="mp-art">' +
-          '<svg viewBox="0 0 180 180" width="180" height="180" xmlns="http://www.w3.org/2000/svg">' +
-            '<rect width="180" height="180" fill="#4a5568" rx="8"/>' +
-            '<text x="90" y="115" text-anchor="middle" font-size="90" fill="#fff">&#9835;</text>' +
-          '</svg>' +
-        '</div>' +
-        '<div class="mp-info">' +
-          '<div class="mp-filename">' + escapeHtml(fileInfo.filename) + '</div>' +
-          '<div class="mp-meta">' + metaLine + '</div>' +
-          '<div class="mp-progress">' +
-            '<div class="mp-progress-bar">' +
-              '<div class="mp-progress-fill" style="width:' + progressPercent + '%"></div>' +
-            '</div>' +
-            '<div class="mp-time">' +
-              '<span>' + formatTimeHMS(playbackElapsed) + '</span>' +
-              '<span> / </span>' +
-              '<span>' + formatTimeHMS(playbackDuration) + '</span>' +
-            '</div>' +
-          '</div>' +
-          '<div class="mp-controls">' + controlsHtml + '</div>' +
-        '</div>' +
-      '</div>';
+      hudHtml;
   }
 
   function openMusicPlayer(entry, fromPlayAll) {
@@ -1356,12 +1501,17 @@
     }
     currentPlayingFile = entry;
     currentView = 'music-player';
+    // Initialize HUD as visible with auto-hide timer
+    musicPlayerHudVisible = true;
+    musicPlayerHudLocked = false;
     startMusicPlayerTimer();
     render();
+    startMusicPlayerHudTimer(); // Start auto-hide after initial render
   }
 
   function closeMusicPlayer() {
     stopPlaybackTimer();
+    clearMusicPlayerHudTimer(); // Clean up HUD timer
     musicPlayerFastMode = null;
     musicPlayerFastSpeed = 0;
 
@@ -1925,12 +2075,17 @@
     }
     currentPlayingFile = entry;
     currentView = 'photo-player';
+    // Initialize HUD as visible with auto-hide timer
+    photoPlayerHudVisible = true;
+    photoPlayerHudLocked = false;
     startPhotoPlayerTimer();
     render();
+    startPhotoPlayerHudTimer(); // Start auto-hide after initial render
   }
 
   function closePhotoPlayer() {
     stopPlaybackTimer();
+    clearPhotoPlayerHudTimer(); // Clean up HUD timer
 
     // Find and select the last played file in the list
     if (currentPlayingIndex >= 0 && currentPlayingIndex < playableFiles.length) {
@@ -1982,9 +2137,11 @@
   function onPhotoPlayerComplete() {
     stopPlaybackTimer();
 
-    // Case 1: No slideshow (Play all), no Repeat
+    // Case 1: No slideshow (Play all), no Repeat - stay on photo, paused
     if (!photoPlayerPlayAllOn && !photoPlayerRepeatOn) {
-      closePhotoPlayer();
+      isPaused = true;
+      playbackElapsed = playbackDuration;
+      renderPhotoPlayer();
       return;
     }
 
@@ -2055,7 +2212,7 @@
     }
   }
 
-  function getPhotoPlayerIcon(type, isHighlight) {
+  function getPhotoPlayerIcon(type, isHighlight, speed) {
     var color = isHighlight ? '#fff' : '#8a94a6';
     switch (type) {
       case 'play':
@@ -2072,8 +2229,17 @@
         return '<svg viewBox="0 0 40 40" width="80" height="80"><path d="M6,12 L20,12 L26,28 L34,28 M6,28 L20,28 L26,12 L34,12" fill="none" stroke="' + color + '" stroke-width="3" stroke-linecap="round"/><polyline points="30,8 34,12 30,16" fill="none" stroke="' + color + '" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/><polyline points="30,24 34,28 30,32" fill="none" stroke="' + color + '" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>';
       case 'repeat':
         return '<svg viewBox="0 0 40 40" width="80" height="80"><path d="M8,14 L8,26 Q8,30 12,30 L28,30 Q32,30 32,26 L32,14 Q32,10 28,10 L12,10" fill="none" stroke="' + color + '" stroke-width="3" stroke-linecap="round"/><polyline points="16,6 12,10 16,14" fill="none" stroke="' + color + '" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>';
-      case 'clock':
-        return '<svg viewBox="0 0 40 40" width="80" height="80"><circle cx="20" cy="20" r="14" fill="none" stroke="' + color + '" stroke-width="3"/><line x1="20" y1="20" x2="20" y2="12" stroke="' + color + '" stroke-width="3" stroke-linecap="round"/><line x1="20" y1="20" x2="26" y2="20" stroke="' + color + '" stroke-width="3" stroke-linecap="round"/></svg>';
+      case 'speedometer':
+        // Needle direction based on speed: fast=right, medium=up, slow=left
+        var needleX2, needleY2;
+        if (speed === 'fast') {
+          needleX2 = 30; needleY2 = 22; // pointing right
+        } else if (speed === 'medium') {
+          needleX2 = 20; needleY2 = 10; // pointing up
+        } else {
+          needleX2 = 10; needleY2 = 22; // pointing left (slow)
+        }
+        return '<svg viewBox="0 0 40 40" width="80" height="80"><path d="M6,28 A16,16 0 1,1 34,28" fill="none" stroke="' + color + '" stroke-width="3" stroke-linecap="round"/><line x1="20" y1="22" x2="' + needleX2 + '" y2="' + needleY2 + '" stroke="' + color + '" stroke-width="3" stroke-linecap="round"/><circle cx="20" cy="22" r="3" fill="' + color + '"/><line x1="10" y1="22" x2="12" y2="22" stroke="' + color + '" stroke-width="2" stroke-linecap="round"/><line x1="28" y1="22" x2="30" y2="22" stroke="' + color + '" stroke-width="2" stroke-linecap="round"/><line x1="20" y1="10" x2="20" y2="12" stroke="' + color + '" stroke-width="2" stroke-linecap="round"/></svg>';
       default:
         return '';
     }
@@ -2092,7 +2258,7 @@
       { id: 'slideshow', content: getPhotoPlayerIcon('slideshow', photoPlayerPlayAllOn), highlight: photoPlayerPlayAllOn },
       { id: 'shuffle', content: getPhotoPlayerIcon('shuffle', photoPlayerShuffleOn), highlight: photoPlayerShuffleOn },
       { id: 'repeat', content: getPhotoPlayerIcon('repeat', photoPlayerRepeatOn), highlight: photoPlayerRepeatOn },
-      { id: 'clock', content: getPhotoPlayerIcon('clock', true), highlight: true }
+      { id: 'speedometer', content: getPhotoPlayerIcon('speedometer', true, photoPlayerSlideSpeed), highlight: true }
     ];
 
     var controlsHtml = '';
@@ -2103,56 +2269,78 @@
       controlsHtml += '<div class="' + cls + '" data-index="' + i + '">' + ctrl.content + '</div>';
     }
 
-    // Photo info
+    // Photo info (use cached metadata to prevent jumping values)
     var entry = currentPlayingFile;
-    var dimensionsStr = generateMockDimensions();
-    var dateStr = generateMockDate();
-    var sizeStr = generateMockFileSize();
-    var infoLine = dimensionsStr + ' | ' + dateStr + ' | ' + sizeStr;
+    var photoInfo = getPhotoFileInfo(entry, currentPlayingIndex);
+    var infoLine = photoInfo.dimensions + ' | ' + photoInfo.date + ' | ' + photoInfo.size;
 
-    // Dynamic background
-    var bgStyle = 'background:#1a1a1a url("' + getPhotoBackground(currentPlayingIndex) + '") center/cover no-repeat';
+    // Dynamic background - use currentPlayingIndex directly for variety
+    var bgUrl = getPhotoBackground(currentPlayingIndex);
+    var bgStyle = "background-color:#1a1a1a;background-image:url('" + bgUrl + "');background-size:cover;background-position:center;background-repeat:no-repeat";
+
+    // Build HUD HTML conditionally based on visibility
+    var hudHtml = '';
+    if (photoPlayerHudVisible) {
+      hudHtml =
+        '<div class="pp-hud">' +
+          '<div class="pp-info">' +
+            '<div class="pp-filename">' + escapeHtml(entry.name) + '</div>' +
+            '<div class="pp-meta">' + escapeHtml(infoLine) + '</div>' +
+            '<div class="pp-controls">' + controlsHtml + '</div>' +
+          '</div>' +
+          '<div class="pp-right">' +
+            '<span class="pp-counter">' + (currentPlayingIndex + 1) + '/' + playableFiles.length + '</span>' +
+          '</div>' +
+        '</div>';
+    }
 
     photoPlayerEl.innerHTML =
       '<div class="pp-bg" style="' + bgStyle + '"></div>' +
-      '<div class="pp-hud">' +
-        '<div class="pp-info">' +
-          '<div class="pp-filename">' + escapeHtml(entry.name) + '</div>' +
-          '<div class="pp-meta">' + escapeHtml(infoLine) + '</div>' +
-          '<div class="pp-controls">' + controlsHtml + '</div>' +
-        '</div>' +
-        '<div class="pp-right">' +
-          '<span class="pp-counter">' + (currentPlayingIndex + 1) + '/' + playableFiles.length + '</span>' +
-        '</div>' +
-      '</div>';
+      hudHtml;
   }
 
   function handlePhotoPlayerNav(act) {
     switch (act) {
       case 'LEFT':
-        if (photoPlayerControlIndex > 0) {
+        if (photoPlayerHudVisible && photoPlayerControlIndex > 0) {
           photoPlayerControlIndex--;
           renderPhotoPlayer();
         }
         return true;
       case 'RIGHT':
-        if (photoPlayerControlIndex < 6) {
+        if (photoPlayerHudVisible && photoPlayerControlIndex < 6) {
           photoPlayerControlIndex++;
           renderPhotoPlayer();
         }
         return true;
       case 'OK':
-        handlePhotoPlayerOK();
+        // If HUD hidden, just show it; if visible, perform control action
+        if (photoPlayerHudVisible) {
+          resetPhotoPlayerHudOnPlayPause(); // Restart auto-hide timer
+          handlePhotoPlayerOK();
+        } else {
+          resetPhotoPlayerHudOnPlayPause(); // Show HUD with auto-hide
+        }
         return true;
       case 'PLAY':
-        // When paused, resume
+        // Show HUD with auto-hide, resume if paused
+        if (photoPlayerHudVisible) {
+          resetPhotoPlayerHudOnPlayPause(); // Restart auto-hide timer
+        } else {
+          resetPhotoPlayerHudOnPlayPause(); // Show HUD with auto-hide
+        }
         if (isPaused) {
           isPaused = false;
           renderPhotoPlayer();
         }
         return true;
       case 'PAUSE':
-        // When playing, pause
+        // Show HUD with auto-hide, pause if playing
+        if (photoPlayerHudVisible) {
+          resetPhotoPlayerHudOnPlayPause(); // Restart auto-hide timer
+        } else {
+          resetPhotoPlayerHudOnPlayPause(); // Show HUD with auto-hide
+        }
         if (!isPaused) {
           isPaused = true;
           renderPhotoPlayer();
@@ -2162,7 +2350,11 @@
         closePhotoPlayer();
         return true;
       case 'INFO':
-        // Show photo info in player
+        // Toggle HUD visibility with INFO key
+        togglePhotoPlayerHudByInfo();
+        return true;
+      case 'OPTION':
+        // No action in Photo Player
         return true;
       default:
         return false;
@@ -2275,23 +2467,87 @@
     return CATEGORIES[selectedCategoryIndex].id === 'photo';
   }
 
+  // Photo Player Info
+  function openPhotoPlayerInfo() {
+    currentView = 'photo-player-info';
+    render();
+  }
+
+  function closePhotoPlayerInfo() {
+    currentView = 'photo-player';
+    render();
+  }
+
+  function renderPhotoPlayerInfo() {
+    if (!photoPlayerInfoEl || !currentPlayingFile) return;
+
+    var entry = currentPlayingFile;
+    var photoInfo = getPhotoFileInfo(entry, currentPlayingIndex);
+
+    var html = '<div class="pp-info-dialog">' +
+      '<div class="pp-info-title">Picture metadata</div>' +
+      '<div class="pp-info-content">' +
+        '<div class="pp-info-row"><span class="pp-info-label">Title:</span> ' + escapeHtml(entry.name) + '</div>' +
+        '<div class="pp-info-row"><span class="pp-info-label">Date:</span> ' + photoInfo.date + '</div>' +
+        '<div class="pp-info-row"><span class="pp-info-label">Size:</span> ' + photoInfo.dimensions + '</div>' +
+        '<div class="pp-info-row"><span class="pp-info-label">File size:</span> ' + photoInfo.size + '</div>' +
+      '</div>' +
+      '<button class="pp-info-close">Close</button>' +
+    '</div>';
+
+    photoPlayerInfoEl.innerHTML = html;
+  }
+
   function handleMusicPlayerNav(act) {
     switch (act) {
       case 'LEFT':
-        if (musicPlayerControlIndex > 0) {
+        if (musicPlayerHudVisible && musicPlayerControlIndex > 0) {
           musicPlayerControlIndex--;
           renderMusicPlayer();
         }
         return true;
       case 'RIGHT':
-        if (musicPlayerControlIndex < 7) {
+        if (musicPlayerHudVisible && musicPlayerControlIndex < 7) {
           musicPlayerControlIndex++;
           renderMusicPlayer();
         }
         return true;
       case 'OK':
+        // If HUD hidden, just show it; if visible, perform control action
+        if (musicPlayerHudVisible) {
+          resetMusicPlayerHudOnPlayPause(); // Restart auto-hide timer
+          handleMusicPlayerOK();
+        } else {
+          resetMusicPlayerHudOnPlayPause(); // Show HUD with auto-hide
+        }
+        return true;
       case 'PLAY':
-        handleMusicPlayerOK();
+        // Show HUD with auto-hide, resume if paused
+        if (musicPlayerHudVisible) {
+          resetMusicPlayerHudOnPlayPause(); // Restart auto-hide timer
+        } else {
+          resetMusicPlayerHudOnPlayPause(); // Show HUD with auto-hide
+        }
+        if (isPaused) {
+          isPaused = false;
+          renderMusicPlayer();
+        }
+        return true;
+      case 'PAUSE':
+        // Show HUD with auto-hide, pause if playing
+        if (musicPlayerHudVisible) {
+          resetMusicPlayerHudOnPlayPause(); // Restart auto-hide timer
+        } else {
+          resetMusicPlayerHudOnPlayPause(); // Show HUD with auto-hide
+        }
+        if (!isPaused) {
+          isPaused = true;
+          renderMusicPlayer();
+        }
+        return true;
+      case 'INFO':
+        // Toggle HUD visibility with INFO key
+        toggleMusicPlayerHudByInfo();
         return true;
       case 'BACK':
         closeMusicPlayer();
@@ -3275,6 +3531,18 @@
       return false;
     }
 
+    // Handle photo-player-info view
+    if (currentView === 'photo-player-info') {
+      switch (act) {
+        case 'OK':
+        case 'BACK':
+        case 'INFO':
+          closePhotoPlayerInfo();
+          return true;
+      }
+      return false;
+    }
+
     // Handle split/devices views
     switch (act) {
       case 'UP':
@@ -3632,8 +3900,8 @@
         '.pp-info{flex:1;display:flex;flex-direction:column;justify-content:center;gap:12px}' +
         '.pp-filename{color:#fff;font-size:1.8rem;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}' +
         '.pp-meta{color:#cbd5e0;font-size:1.2rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}' +
-        '.pp-controls{display:flex;flex-direction:row;align-items:center;justify-content:flex-start;gap:24px;margin-top:8px}' +
-        '.pp-ctrl-btn{width:80px;height:80px;display:flex;align-items:center;justify-content:center;' +
+        '.pp-controls{display:flex;flex-direction:row;align-items:center;justify-content:center;gap:32px;margin-top:16px}' +
+        '.pp-ctrl-btn{width:100px;height:100px;display:flex;align-items:center;justify-content:center;' +
           'border-radius:12px;cursor:pointer;transition:all .15s;border:3px solid transparent}' +
         '.pp-ctrl-btn:hover{background:rgba(255,255,255,.1)}' +
         '.pp-ctrl-btn.pp-ctrl-selected{background:#3182ce;border-color:#fff}' +
@@ -3655,6 +3923,18 @@
         '.pp-speed-name{flex:1;font-size:1.4rem;font-weight:500}' +
         '.pp-speed-check{font-size:1.4rem;color:#e2e8f0}' +
         '.pp-speed-item.pp-speed-item-selected .pp-speed-check{color:#fff}' +
+        // Photo Player Info dialog
+        '.photo-player-info{position:absolute;inset:0;display:none;align-items:center;justify-content:center;' +
+          'background:rgba(0,0,0,.7);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}' +
+        '.pp-info-dialog{background:#4a5568;border:3px solid #718096;border-radius:16px;' +
+          'padding:32px 48px;min-width:480px;box-shadow:0 12px 60px rgba(0,0,0,.8)}' +
+        '.pp-info-title{color:#ffc239;font-size:2rem;font-weight:600;margin-bottom:28px}' +
+        '.pp-info-content{margin-bottom:32px}' +
+        '.pp-info-row{color:#e2e8f0;font-size:1.4rem;margin:12px 0;line-height:1.6}' +
+        '.pp-info-label{color:#e2e8f0;font-weight:600}' +
+        '.pp-info-close{display:block;width:100%;background:#3182ce;color:#fff;border:none;' +
+          'border-radius:28px;padding:16px 32px;font-size:1.3rem;font-weight:600;cursor:pointer;transition:background .15s}' +
+        '.pp-info-close:hover{background:#2b6cb0}' +
         '</style>' +
         '<div class="usb-root">' +
           '<div class="usb-player">' +
@@ -3685,6 +3965,7 @@
             '<div class="photo-player-view"></div>' +
             '<div class="photo-info"></div>' +
             '<div class="photo-slidespeed-menu"></div>' +
+            '<div class="photo-player-info"></div>' +
           '</div>' +
         '</div>';
       stageEl = el.querySelector('.usb-stage');
@@ -3710,6 +3991,7 @@
       photoPlayerEl = el.querySelector('.photo-player-view');
       photoInfoEl = el.querySelector('.photo-info');
       photoSlidespeedMenuEl = el.querySelector('.photo-slidespeed-menu');
+      photoPlayerInfoEl = el.querySelector('.photo-player-info');
     },
 
     onShow: function (params) {
@@ -3822,6 +4104,8 @@
             if (!entry.isDirectory && isPlayableFile(entry.name)) {
               if (isMusicFile(entry.name)) {
                 openMusicPlayer(entry, false);
+              } else if (isPhotoFile(entry.name)) {
+                openPhotoPlayer(entry, false);
               } else {
                 playFile(entry);
               }
