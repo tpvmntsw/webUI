@@ -38,7 +38,7 @@
 
   var usbDevices = [];
   var selectedDeviceIndex = 0;
-  // 'idle' | 'devices' | 'split' | 'playing' | 'option-menu' | 'video-info' | 'music-options' | 'music-repeat-submenu' | 'music-player' | 'photo-options' | 'photo-viewmode-submenu' | 'photo-repeat-submenu' | 'photo-slidespeed-submenu' | 'photo-player' | 'photo-info' | 'photo-slidespeed-menu' | 'photo-player-info'
+  // 'idle' | 'devices' | 'split' | 'playing' | 'option-menu' | 'video-info' | 'music-options' | 'music-repeat-submenu' | 'music-player' | 'photo-options' | 'photo-viewmode-submenu' | 'photo-repeat-submenu' | 'photo-slidespeed-submenu' | 'photo-player' | 'photo-info' | 'photo-slidespeed-menu' | 'photo-player-info' | 'video-options' | 'video-viewmode-submenu' | 'video-repeat-submenu' | 'video-info-dialog'
   var currentView = 'idle';
   var musicPlayerEl = null;
   var photoOptionsEl = null;
@@ -99,6 +99,19 @@
   var photoRepeatSubmenuIndex = 0;
   var photoSlidespeedSubmenuIndex = 0;
   var photoOptionsFromLeftPanel = false;
+
+  // Video Options state
+  var videoOptionsEl = null;
+  var videoViewmodeSubmenuEl = null;
+  var videoRepeatSubmenuEl = null;
+  var videoOptionsIndex = 0;
+  var videoViewMode = 'thumbnails'; // 'thumbnails' | 'list'
+  var videoShuffleOn = false;
+  var videoRepeatMode = 'play-once'; // 'play-once' | 'repeat'
+  var videoViewmodeSubmenuIndex = 0;
+  var videoRepeatSubmenuIndex = 0;
+  var videoOptionsFromLeftPanel = false;
+  var videoInfoDialogEl = null;
 
   // Photo Player state
   var photoPlayerControlIndex = 0; // 0-5: play/pause, prev, next, shuffle, repeat, slidespeed
@@ -517,7 +530,7 @@
   };
 
   function render() {
-    if (!idleEl || !deviceListEl || !splitViewEl || !playerViewEl || !optionMenuEl || !videoInfoEl || !fullscreenEl || !windowEl || !musicOptionsEl || !musicRepeatSubmenuEl || !musicPlayerEl || !photoOptionsEl || !photoViewmodeSubmenuEl || !photoRepeatSubmenuEl || !photoSlidespeedSubmenuEl || !photoPlayerEl || !photoInfoEl || !photoSlidespeedMenuEl || !photoPlayerInfoEl) return;
+    if (!idleEl || !deviceListEl || !splitViewEl || !playerViewEl || !optionMenuEl || !videoInfoEl || !fullscreenEl || !windowEl || !musicOptionsEl || !musicRepeatSubmenuEl || !musicPlayerEl || !photoOptionsEl || !photoViewmodeSubmenuEl || !photoRepeatSubmenuEl || !photoSlidespeedSubmenuEl || !photoPlayerEl || !photoInfoEl || !photoSlidespeedMenuEl || !photoPlayerInfoEl || !videoOptionsEl || !videoViewmodeSubmenuEl || !videoRepeatSubmenuEl || !videoInfoDialogEl) return;
 
     // Hide all views
     idleEl.style.display = 'none';
@@ -537,8 +550,12 @@
     photoInfoEl.style.display = 'none';
     photoSlidespeedMenuEl.style.display = 'none';
     photoPlayerInfoEl.style.display = 'none';
+    videoOptionsEl.style.display = 'none';
+    videoViewmodeSubmenuEl.style.display = 'none';
+    videoRepeatSubmenuEl.style.display = 'none';
+    videoInfoDialogEl.style.display = 'none';
 
-    // Determine if we're in fullscreen mode (split/playing/option-menu/video-info/music-options/music-repeat-submenu/music-player/photo-*)
+    // Determine if we're in fullscreen mode (split/playing/option-menu/video-info/music-options/music-repeat-submenu/music-player/photo-*/video-*)
     var isFullscreenView = (currentView === 'split' || currentView === 'playing' ||
                             currentView === 'option-menu' || currentView === 'video-info' ||
                             currentView === 'music-options' || currentView === 'music-repeat-submenu' ||
@@ -547,7 +564,9 @@
                             currentView === 'photo-repeat-submenu' || currentView === 'photo-slidespeed-submenu' ||
                             currentView === 'photo-player' || currentView === 'photo-info' ||
                             currentView === 'photo-slidespeed-menu' ||
-                            currentView === 'photo-player-info');
+                            currentView === 'photo-player-info' ||
+                            currentView === 'video-options' || currentView === 'video-viewmode-submenu' ||
+                            currentView === 'video-repeat-submenu' || currentView === 'video-info-dialog');
 
     // Toggle between windowed (idle/devices) and fullscreen (split/playing) containers
     windowEl.style.display = isFullscreenView ? 'none' : 'flex';
@@ -648,6 +667,30 @@
       photoPlayerInfoEl.style.display = 'flex';
       renderPhotoPlayer();
       renderPhotoPlayerInfo();
+    } else if (currentView === 'video-options') {
+      splitViewEl.style.display = 'flex';
+      videoOptionsEl.style.display = 'flex';
+      renderLeftPanel();
+      renderRightPanel();
+      renderVideoOptions();
+    } else if (currentView === 'video-viewmode-submenu') {
+      splitViewEl.style.display = 'flex';
+      videoViewmodeSubmenuEl.style.display = 'flex';
+      renderLeftPanel();
+      renderRightPanel();
+      renderVideoViewmodeSubmenu();
+    } else if (currentView === 'video-repeat-submenu') {
+      splitViewEl.style.display = 'flex';
+      videoRepeatSubmenuEl.style.display = 'flex';
+      renderLeftPanel();
+      renderRightPanel();
+      renderVideoRepeatSubmenu();
+    } else if (currentView === 'video-info-dialog') {
+      splitViewEl.style.display = 'flex';
+      videoInfoDialogEl.style.display = 'flex';
+      renderLeftPanel();
+      renderRightPanel();
+      renderVideoInfoDialog();
     }
   }
 
@@ -2467,6 +2510,336 @@
     return CATEGORIES[selectedCategoryIndex].id === 'photo';
   }
 
+  function isVideoCategory() {
+    return CATEGORIES[selectedCategoryIndex].id === 'video';
+  }
+
+  // Video Options functions
+  function openVideoOptions(fromLeftPanel) {
+    var cat = CATEGORIES[selectedCategoryIndex];
+    if (cat.id !== 'video') return false;
+
+    videoOptionsFromLeftPanel = fromLeftPanel;
+    videoOptionsIndex = 0;
+    currentView = 'video-options';
+    render();
+    return true;
+  }
+
+  function closeVideoOptions() {
+    currentView = 'split';
+    render();
+  }
+
+  function renderVideoOptions() {
+    if (!videoOptionsEl) return;
+
+    var shuffleToggle = videoShuffleOn ?
+      '<span class="video-opt-toggle video-opt-toggle-on"></span>' :
+      '<span class="video-opt-toggle video-opt-toggle-off"></span>';
+
+    // Determine menu items based on context
+    var hasPlayAll = !videoOptionsFromLeftPanel && folderEntries.length > 0 &&
+                     selectedFolderIndex < folderEntries.length &&
+                     !folderEntries[selectedFolderIndex].isDirectory &&
+                     isVideoFile(folderEntries[selectedFolderIndex].name);
+    var hasInfo = hasPlayAll;
+
+    var html = '<div class="video-opt-dialog">' +
+      '<div class="video-opt-header">' +
+        '<span class="video-opt-title">Options</span>' +
+      '</div>' +
+      '<div class="video-opt-list">';
+
+    var idx = 0;
+
+    // Play all option (only for video files)
+    if (hasPlayAll) {
+      var playAllCls = 'video-opt-item' + (videoOptionsIndex === idx ? ' video-opt-item-selected' : '');
+      html += '<div class="' + playAllCls + '" data-index="' + idx + '">' +
+        '<span class="video-opt-name">Play all</span>' +
+      '</div>';
+      idx++;
+    }
+
+    // List/Thumbnails
+    var viewmodeCls = 'video-opt-item' + (videoOptionsIndex === idx ? ' video-opt-item-selected' : '');
+    html += '<div class="' + viewmodeCls + '" data-index="' + idx + '">' +
+      '<span class="video-opt-name">List/Thumbnails</span>' +
+      '<span class="video-opt-arrow">&#10095;</span>' +
+    '</div>';
+    idx++;
+
+    // Shuffle
+    var shuffleCls = 'video-opt-item' + (videoOptionsIndex === idx ? ' video-opt-item-selected' : '');
+    html += '<div class="' + shuffleCls + '" data-index="' + idx + '">' +
+      '<span class="video-opt-name">Shuffle</span>' +
+      shuffleToggle +
+    '</div>';
+    idx++;
+
+    // Repeat
+    var repeatCls = 'video-opt-item' + (videoOptionsIndex === idx ? ' video-opt-item-selected' : '');
+    html += '<div class="' + repeatCls + '" data-index="' + idx + '">' +
+      '<span class="video-opt-name">Repeat</span>' +
+      '<span class="video-opt-arrow">&#10095;</span>' +
+    '</div>';
+    idx++;
+
+    // Info (only for video files)
+    if (hasInfo) {
+      var infoCls = 'video-opt-item' + (videoOptionsIndex === idx ? ' video-opt-item-selected' : '');
+      html += '<div class="' + infoCls + '" data-index="' + idx + '">' +
+        '<span class="video-opt-name">Info</span>' +
+      '</div>';
+    }
+
+    html += '</div></div>';
+
+    videoOptionsEl.innerHTML = html;
+  }
+
+  function getVideoOptionsMaxIndex() {
+    var hasPlayAll = !videoOptionsFromLeftPanel && folderEntries.length > 0 &&
+                     selectedFolderIndex < folderEntries.length &&
+                     !folderEntries[selectedFolderIndex].isDirectory &&
+                     isVideoFile(folderEntries[selectedFolderIndex].name);
+    // Base items: List/Thumbnails, Shuffle, Repeat = 3
+    // If hasPlayAll: +1 for Play all, +1 for Info = 5 total
+    // If folder/left panel: 3 total
+    if (hasPlayAll) {
+      return 4; // 0-4: playall, viewmode, shuffle, repeat, info
+    }
+    return 2; // 0-2: viewmode, shuffle, repeat
+  }
+
+  function getVideoOptionItem(index) {
+    var hasPlayAll = !videoOptionsFromLeftPanel && folderEntries.length > 0 &&
+                     selectedFolderIndex < folderEntries.length &&
+                     !folderEntries[selectedFolderIndex].isDirectory &&
+                     isVideoFile(folderEntries[selectedFolderIndex].name);
+
+    if (hasPlayAll) {
+      var items = ['playall', 'viewmode', 'shuffle', 'repeat', 'info'];
+      return items[index] || '';
+    } else {
+      var items = ['viewmode', 'shuffle', 'repeat'];
+      return items[index] || '';
+    }
+  }
+
+  function handleVideoOptionsOK() {
+    var item = getVideoOptionItem(videoOptionsIndex);
+    switch (item) {
+      case 'playall':
+        closeVideoOptions();
+        playAllVideosFromOptions();
+        break;
+      case 'viewmode':
+        openVideoViewmodeSubmenu();
+        break;
+      case 'shuffle':
+        videoShuffleOn = !videoShuffleOn;
+        renderVideoOptions();
+        break;
+      case 'repeat':
+        openVideoRepeatSubmenu();
+        break;
+      case 'info':
+        closeVideoOptions();
+        showVideoInfoDialog();
+        break;
+    }
+  }
+
+  function handleVideoOptionsRight() {
+    var item = getVideoOptionItem(videoOptionsIndex);
+    if (item === 'viewmode' || item === 'repeat') {
+      handleVideoOptionsOK();
+    }
+  }
+
+  // Video Viewmode submenu
+  function openVideoViewmodeSubmenu() {
+    videoViewmodeSubmenuIndex = (videoViewMode === 'thumbnails') ? 0 : 1;
+    currentView = 'video-viewmode-submenu';
+    render();
+  }
+
+  function closeVideoViewmodeSubmenu() {
+    currentView = 'video-options';
+    render();
+  }
+
+  function renderVideoViewmodeSubmenu() {
+    if (!videoViewmodeSubmenuEl) return;
+
+    var thumbCls = 'video-submenu-item' + (videoViewmodeSubmenuIndex === 0 ? ' video-submenu-item-selected' : '');
+    var listCls = 'video-submenu-item' + (videoViewmodeSubmenuIndex === 1 ? ' video-submenu-item-selected' : '');
+
+    var thumbCheck = (videoViewMode === 'thumbnails') ? '<span class="video-submenu-check">&#10003;</span>' : '';
+    var listCheck = (videoViewMode === 'list') ? '<span class="video-submenu-check">&#10003;</span>' : '';
+
+    var html = '<div class="video-submenu-dialog">' +
+      '<div class="video-submenu-header">' +
+        '<span class="video-submenu-title">List/Thumbnails</span>' +
+      '</div>' +
+      '<div class="video-submenu-list">' +
+        '<div class="' + thumbCls + '" data-index="0">' +
+          '<span class="video-submenu-name">Thumbnails</span>' +
+          thumbCheck +
+        '</div>' +
+        '<div class="' + listCls + '" data-index="1">' +
+          '<span class="video-submenu-name">List</span>' +
+          listCheck +
+        '</div>' +
+      '</div>' +
+    '</div>';
+
+    videoViewmodeSubmenuEl.innerHTML = html;
+  }
+
+  function confirmVideoViewmode() {
+    videoViewMode = (videoViewmodeSubmenuIndex === 0) ? 'thumbnails' : 'list';
+    renderVideoViewmodeSubmenu();
+  }
+
+  // Video Repeat submenu
+  function openVideoRepeatSubmenu() {
+    videoRepeatSubmenuIndex = (videoRepeatMode === 'play-once') ? 0 : 1;
+    currentView = 'video-repeat-submenu';
+    render();
+  }
+
+  function closeVideoRepeatSubmenu() {
+    currentView = 'video-options';
+    render();
+  }
+
+  function renderVideoRepeatSubmenu() {
+    if (!videoRepeatSubmenuEl) return;
+
+    var playOnceCls = 'video-submenu-item' + (videoRepeatSubmenuIndex === 0 ? ' video-submenu-item-selected' : '');
+    var repeatCls = 'video-submenu-item' + (videoRepeatSubmenuIndex === 1 ? ' video-submenu-item-selected' : '');
+
+    var playOnceCheck = (videoRepeatMode === 'play-once') ? '<span class="video-submenu-check">&#10003;</span>' : '';
+    var repeatCheck = (videoRepeatMode === 'repeat') ? '<span class="video-submenu-check">&#10003;</span>' : '';
+
+    var html = '<div class="video-submenu-dialog">' +
+      '<div class="video-submenu-header">' +
+        '<span class="video-submenu-title">Repeat</span>' +
+      '</div>' +
+      '<div class="video-submenu-list">' +
+        '<div class="' + playOnceCls + '" data-index="0">' +
+          '<span class="video-submenu-name">Repeat once</span>' +
+          playOnceCheck +
+        '</div>' +
+        '<div class="' + repeatCls + '" data-index="1">' +
+          '<span class="video-submenu-name">Repeat</span>' +
+          repeatCheck +
+        '</div>' +
+      '</div>' +
+    '</div>';
+
+    videoRepeatSubmenuEl.innerHTML = html;
+  }
+
+  function confirmVideoRepeat() {
+    videoRepeatMode = (videoRepeatSubmenuIndex === 0) ? 'play-once' : 'repeat';
+    renderVideoRepeatSubmenu();
+  }
+
+  // Video Info Dialog (from Options menu)
+  function showVideoInfoDialog() {
+    if (activePanel !== 'right') return false;
+    if (folderEntries.length === 0) return false;
+
+    var entry = folderEntries[selectedFolderIndex];
+    if (entry.isDirectory) return false;
+    if (!isVideoFile(entry.name)) return false;
+
+    currentView = 'video-info-dialog';
+    render();
+    return true;
+  }
+
+  function closeVideoInfoDialog() {
+    currentView = 'split';
+    render();
+  }
+
+  function renderVideoInfoDialog() {
+    if (!videoInfoDialogEl) return;
+    var entry = folderEntries[selectedFolderIndex];
+    if (!entry) return;
+
+    var duration = getFileDuration(entry.name);
+    var durationStr = formatDuration(duration);
+    var sizeStr = generateMockFileSize();
+    var dateStr = generateMockDate();
+
+    var html = '<div class="video-info-dlg-dialog">' +
+      '<div class="video-info-dlg-title">Video metadata</div>' +
+      '<div class="video-info-dlg-content">' +
+        '<div class="video-info-dlg-row"><span class="video-info-dlg-label">Title:</span> ' + escapeHtml(entry.name) + '</div>' +
+        '<div class="video-info-dlg-row"><span class="video-info-dlg-label">Size:</span> ' + sizeStr + '</div>' +
+        '<div class="video-info-dlg-row"><span class="video-info-dlg-label">Date:</span> ' + dateStr + '</div>' +
+        '<div class="video-info-dlg-row"><span class="video-info-dlg-label">Duration:</span> ' + durationStr + '</div>' +
+      '</div>' +
+      '<button class="video-info-dlg-close">Close</button>' +
+    '</div>';
+
+    videoInfoDialogEl.innerHTML = html;
+  }
+
+  // Play all videos
+  function buildPlayableVideoList() {
+    playableFiles = [];
+    for (var i = 0; i < folderEntries.length; i++) {
+      var entry = folderEntries[i];
+      if (!entry.isDirectory && isVideoFile(entry.name)) {
+        playableFiles.push(entry);
+      }
+    }
+  }
+
+  function playAllVideosFromOptions() {
+    buildPlayableVideoList();
+    if (playableFiles.length === 0) return;
+
+    var startEntry;
+    if (videoShuffleOn) {
+      var startIndex = Math.floor(Math.random() * playableFiles.length);
+      startEntry = playableFiles[startIndex];
+    } else {
+      startEntry = playableFiles[0];
+    }
+
+    // Update playback mode based on options
+    if (videoShuffleOn) {
+      playbackMode = 'shuffle';
+    } else if (videoRepeatMode === 'repeat') {
+      playbackMode = 'repeat-all';
+    } else {
+      playbackMode = 'single';
+    }
+
+    currentPlayingIndex = -1;
+    for (var i = 0; i < playableFiles.length; i++) {
+      if (playableFiles[i].name === startEntry.name) {
+        currentPlayingIndex = i;
+        break;
+      }
+    }
+    if (currentPlayingIndex === -1 && playableFiles.length > 0) {
+      currentPlayingIndex = 0;
+    }
+    currentPlayingFile = startEntry;
+    currentView = 'playing';
+    startPlaybackTimer();
+    render();
+  }
+
   // Photo Player Info
   function openPhotoPlayerInfo() {
     currentView = 'photo-player-info';
@@ -3543,6 +3916,100 @@
       return false;
     }
 
+    // Handle video-options view
+    if (currentView === 'video-options') {
+      var maxIdx = getVideoOptionsMaxIndex();
+      switch (act) {
+        case 'UP':
+          if (videoOptionsIndex > 0) {
+            videoOptionsIndex--;
+            renderVideoOptions();
+          }
+          return true;
+        case 'DOWN':
+          if (videoOptionsIndex < maxIdx) {
+            videoOptionsIndex++;
+            renderVideoOptions();
+          }
+          return true;
+        case 'OK':
+          handleVideoOptionsOK();
+          return true;
+        case 'RIGHT':
+          handleVideoOptionsRight();
+          return true;
+        case 'BACK':
+        case 'OPTION':
+          closeVideoOptions();
+          return true;
+      }
+      return false;
+    }
+
+    // Handle video-viewmode-submenu view
+    if (currentView === 'video-viewmode-submenu') {
+      switch (act) {
+        case 'UP':
+          if (videoViewmodeSubmenuIndex > 0) {
+            videoViewmodeSubmenuIndex--;
+            renderVideoViewmodeSubmenu();
+          }
+          return true;
+        case 'DOWN':
+          if (videoViewmodeSubmenuIndex < 1) {
+            videoViewmodeSubmenuIndex++;
+            renderVideoViewmodeSubmenu();
+          }
+          return true;
+        case 'OK':
+          confirmVideoViewmode();
+          return true;
+        case 'LEFT':
+        case 'BACK':
+          closeVideoViewmodeSubmenu();
+          return true;
+      }
+      return false;
+    }
+
+    // Handle video-repeat-submenu view
+    if (currentView === 'video-repeat-submenu') {
+      switch (act) {
+        case 'UP':
+          if (videoRepeatSubmenuIndex > 0) {
+            videoRepeatSubmenuIndex--;
+            renderVideoRepeatSubmenu();
+          }
+          return true;
+        case 'DOWN':
+          if (videoRepeatSubmenuIndex < 1) {
+            videoRepeatSubmenuIndex++;
+            renderVideoRepeatSubmenu();
+          }
+          return true;
+        case 'OK':
+          confirmVideoRepeat();
+          return true;
+        case 'LEFT':
+        case 'BACK':
+          closeVideoRepeatSubmenu();
+          return true;
+      }
+      return false;
+    }
+
+    // Handle video-info-dialog view
+    if (currentView === 'video-info-dialog') {
+      switch (act) {
+        case 'OK':
+        case 'BACK':
+        case 'INFO':
+          closeVideoInfoDialog();
+          return true;
+      }
+      return false;
+    }
+
     // Handle split/devices views
     switch (act) {
       case 'UP':
@@ -3597,6 +4064,18 @@
             // Open photo options for folders or photo files
             if (entry.isDirectory || isPhotoFile(entry.name)) {
               return openPhotoOptions(entry.isDirectory);
+            }
+          }
+        }
+        // Option key in Video category opens video options
+        if (isVideoCategory()) {
+          if (activePanel === 'left') {
+            return openVideoOptions(true);
+          } else if (activePanel === 'right' && folderEntries.length > 0) {
+            var entry = folderEntries[selectedFolderIndex];
+            // Open video options for folders or video files
+            if (entry.isDirectory || isVideoFile(entry.name)) {
+              return openVideoOptions(entry.isDirectory);
             }
           }
         }
@@ -3935,6 +4414,54 @@
         '.pp-info-close{display:block;width:100%;background:#3182ce;color:#fff;border:none;' +
           'border-radius:28px;padding:16px 32px;font-size:1.3rem;font-weight:600;cursor:pointer;transition:background .15s}' +
         '.pp-info-close:hover{background:#2b6cb0}' +
+        // Video Options dialog styles (matching Photo Options style)
+        '.video-options{position:absolute;inset:0;display:none;align-items:flex-start;justify-content:flex-start;' +
+          'background:rgba(0,0,0,.5);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);padding-top:80px;padding-left:60px}' +
+        '.video-opt-dialog{background:#4a5568;border:3px solid #718096;border-radius:16px;min-width:420px;' +
+          'padding:32px 48px;box-shadow:0 12px 60px rgba(0,0,0,.8)}' +
+        '.video-opt-header{margin-bottom:24px}' +
+        '.video-opt-title{font-size:2rem;font-weight:600;color:#ffc239;letter-spacing:.5px}' +
+        '.video-opt-list{display:flex;flex-direction:column;gap:8px}' +
+        '.video-opt-item{display:flex;align-items:center;padding:18px 24px;color:#e2e8f0;' +
+          'background:#5a6578;border:2px solid #718096;border-radius:12px;cursor:pointer;transition:all .15s}' +
+        '.video-opt-item:hover{background:#6a7588;border-color:#8a94a6}' +
+        '.video-opt-item.video-opt-item-selected{background:#3182ce;color:#fff;border-color:#fff}' +
+        '.video-opt-name{flex:1;font-size:1.4rem;font-weight:500}' +
+        '.video-opt-arrow{font-size:1.2rem;color:#a0aec0}' +
+        '.video-opt-item.video-opt-item-selected .video-opt-arrow{color:#fff}' +
+        '.video-opt-toggle{display:inline-block;width:52px;height:28px;border-radius:14px;position:relative;transition:background .2s}' +
+        '.video-opt-toggle::after{content:"";position:absolute;top:3px;width:22px;height:22px;border-radius:50%;background:#fff;transition:left .2s}' +
+        '.video-opt-toggle-off{background:#718096}' +
+        '.video-opt-toggle-off::after{left:3px}' +
+        '.video-opt-toggle-on{background:#3a86ff}' +
+        '.video-opt-toggle-on::after{left:27px}' +
+        // Video submenu dialog styles (for viewmode, repeat)
+        '.video-submenu{position:absolute;inset:0;display:none;align-items:flex-start;justify-content:flex-start;' +
+          'background:rgba(0,0,0,.5);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);padding-top:80px;padding-left:60px}' +
+        '.video-submenu-dialog{background:#4a5568;border:3px solid #718096;border-radius:16px;min-width:420px;' +
+          'padding:32px 48px;box-shadow:0 12px 60px rgba(0,0,0,.8)}' +
+        '.video-submenu-header{margin-bottom:24px}' +
+        '.video-submenu-title{font-size:2rem;font-weight:600;color:#ffc239;letter-spacing:.5px}' +
+        '.video-submenu-list{display:flex;flex-direction:column;gap:8px}' +
+        '.video-submenu-item{display:flex;align-items:center;padding:18px 24px;color:#e2e8f0;' +
+          'background:#5a6578;border:2px solid #718096;border-radius:12px;cursor:pointer;transition:all .15s}' +
+        '.video-submenu-item:hover{background:#6a7588;border-color:#8a94a6}' +
+        '.video-submenu-item.video-submenu-item-selected{background:#3182ce;color:#fff;border-color:#fff}' +
+        '.video-submenu-name{flex:1;font-size:1.4rem;font-weight:500}' +
+        '.video-submenu-check{font-size:1.4rem;color:#e2e8f0}' +
+        '.video-submenu-item.video-submenu-item-selected .video-submenu-check{color:#fff}' +
+        // Video Info dialog styles (from Options menu)
+        '.video-info-dialog{position:absolute;inset:0;display:none;align-items:center;justify-content:center;' +
+          'background:rgba(0,0,0,.7);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}' +
+        '.video-info-dlg-dialog{background:#4a5568;border:3px solid #718096;border-radius:16px;' +
+          'padding:32px 48px;min-width:480px;box-shadow:0 12px 60px rgba(0,0,0,.8)}' +
+        '.video-info-dlg-title{color:#ffc239;font-size:2rem;font-weight:600;margin-bottom:28px}' +
+        '.video-info-dlg-content{margin-bottom:32px}' +
+        '.video-info-dlg-row{color:#e2e8f0;font-size:1.4rem;margin:12px 0;line-height:1.6}' +
+        '.video-info-dlg-label{color:#e2e8f0;font-weight:600}' +
+        '.video-info-dlg-close{display:block;width:100%;background:#3182ce;color:#fff;border:none;' +
+          'border-radius:28px;padding:16px 32px;font-size:1.3rem;font-weight:600;cursor:pointer;transition:background .15s}' +
+        '.video-info-dlg-close:hover{background:#2b6cb0}' +
         '</style>' +
         '<div class="usb-root">' +
           '<div class="usb-player">' +
@@ -3966,6 +4493,10 @@
             '<div class="photo-info"></div>' +
             '<div class="photo-slidespeed-menu"></div>' +
             '<div class="photo-player-info"></div>' +
+            '<div class="video-options"></div>' +
+            '<div class="video-submenu video-viewmode-submenu"></div>' +
+            '<div class="video-submenu video-repeat-submenu"></div>' +
+            '<div class="video-info-dialog"></div>' +
           '</div>' +
         '</div>';
       stageEl = el.querySelector('.usb-stage');
@@ -3992,6 +4523,10 @@
       photoInfoEl = el.querySelector('.photo-info');
       photoSlidespeedMenuEl = el.querySelector('.photo-slidespeed-menu');
       photoPlayerInfoEl = el.querySelector('.photo-player-info');
+      videoOptionsEl = el.querySelector('.video-options');
+      videoViewmodeSubmenuEl = el.querySelector('.video-viewmode-submenu');
+      videoRepeatSubmenuEl = el.querySelector('.video-repeat-submenu');
+      videoInfoDialogEl = el.querySelector('.video-info-dialog');
     },
 
     onShow: function (params) {
