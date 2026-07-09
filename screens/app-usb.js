@@ -48,6 +48,7 @@
   var photoPlayerEl = null;
   var photoInfoEl = null;
   var photoSlidespeedMenuEl = null;
+  var playerSlidespeedMenuEl = null;
   var photoPlayerInfoEl = null;
   var currentDeviceId = null;
   // 'left' | 'right' - which panel is active
@@ -623,7 +624,7 @@
   };
 
   function render() {
-    if (!idleEl || !deviceListEl || !splitViewEl || !playerViewEl || !optionMenuEl || !videoInfoEl || !fullscreenEl || !windowEl || !mediaOptionsEl || !mediaSlidespeedSubmenuEl || !musicPlayerEl || !photoPlayerEl || !photoSlidespeedMenuEl || !photoPlayerInfoEl || !videoInfoDialogEl || !videoPlayerEl) return;
+    if (!idleEl || !deviceListEl || !splitViewEl || !playerViewEl || !optionMenuEl || !videoInfoEl || !fullscreenEl || !windowEl || !mediaOptionsEl || !mediaSlidespeedSubmenuEl || !musicPlayerEl || !photoPlayerEl || !photoSlidespeedMenuEl || !photoPlayerInfoEl || !playerSlidespeedMenuEl || !videoInfoDialogEl || !videoPlayerEl) return;
 
     // Hide all views
     idleEl.style.display = 'none';
@@ -638,6 +639,7 @@
     photoPlayerEl.style.display = 'none';
     photoSlidespeedMenuEl.style.display = 'none';
     photoPlayerInfoEl.style.display = 'none';
+    playerSlidespeedMenuEl.style.display = 'none';
     videoInfoDialogEl.style.display = 'none';
     videoPlayerEl.style.display = 'none';
 
@@ -649,6 +651,7 @@
                             currentView === 'photo-player' ||
                             currentView === 'photo-slidespeed-menu' ||
                             currentView === 'photo-player-info' ||
+                            currentView === 'player-slidespeed-menu' ||
                             currentView === 'video-info-dialog' ||
                             currentView === 'video-player');
 
@@ -721,6 +724,20 @@
       photoPlayerInfoEl.style.display = 'flex';
       renderPhotoPlayer();
       renderPhotoPlayerInfo();
+    } else if (currentView === 'player-slidespeed-menu') {
+      // Show the appropriate player background based on source
+      if (playerSlidespeedMenuSource === 'video') {
+        videoPlayerEl.style.display = 'flex';
+        renderVideoPlayer();
+      } else if (playerSlidespeedMenuSource === 'music') {
+        musicPlayerEl.style.display = 'flex';
+        renderMusicPlayer();
+      } else {
+        photoPlayerEl.style.display = 'flex';
+        renderPhotoPlayer();
+      }
+      playerSlidespeedMenuEl.style.display = 'flex';
+      renderPlayerSlidespeedMenu();
     } else if (currentView === 'video-info-dialog') {
       splitViewEl.style.display = 'flex';
       videoInfoDialogEl.style.display = 'flex';
@@ -1323,28 +1340,34 @@
     }
   }
 
-  // Music Player SVG icons - clean, universally recognizable (80x80 size)
-  function getMusicPlayerIcon(type, isHighlight) {
+  // Unified Player HUD icons (50x50 size for 9-control compact HUD)
+  function getPlayerIcon(type, isHighlight, speed) {
     var color = isHighlight ? '#fff' : '#8a94a6';
     switch (type) {
       case 'play':
-        return '<svg viewBox="0 0 40 40" width="80" height="80"><polygon points="12,8 32,20 12,32" fill="' + color + '"/></svg>';
+        return '<svg viewBox="0 0 40 40" width="50" height="50"><polygon points="12,8 32,20 12,32" fill="' + color + '"/></svg>';
       case 'pause':
-        return '<svg viewBox="0 0 40 40" width="80" height="80"><rect x="10" y="8" width="7" height="24" fill="' + color + '"/><rect x="23" y="8" width="7" height="24" fill="' + color + '"/></svg>';
+        return '<svg viewBox="0 0 40 40" width="50" height="50"><rect x="10" y="8" width="7" height="24" fill="' + color + '"/><rect x="23" y="8" width="7" height="24" fill="' + color + '"/></svg>';
       case 'rewind':
-        return '<svg viewBox="0 0 40 40" width="80" height="80"><polygon points="20,8 20,32 4,20" fill="' + color + '"/><polygon points="36,8 36,32 20,20" fill="' + color + '"/></svg>';
+        return '<svg viewBox="0 0 40 40" width="50" height="50"><polygon points="20,8 20,32 4,20" fill="' + color + '"/><polygon points="36,8 36,32 20,20" fill="' + color + '"/></svg>';
       case 'forward':
-        return '<svg viewBox="0 0 40 40" width="80" height="80"><polygon points="4,8 20,20 4,32" fill="' + color + '"/><polygon points="20,8 36,20 20,32" fill="' + color + '"/></svg>';
+        return '<svg viewBox="0 0 40 40" width="50" height="50"><polygon points="4,8 20,20 4,32" fill="' + color + '"/><polygon points="20,8 36,20 20,32" fill="' + color + '"/></svg>';
       case 'prev':
-        return '<svg viewBox="0 0 40 40" width="80" height="80"><rect x="6" y="8" width="4" height="24" fill="' + color + '"/><polygon points="34,8 34,32 14,20" fill="' + color + '"/></svg>';
+        return '<svg viewBox="0 0 40 40" width="50" height="50"><rect x="6" y="8" width="4" height="24" fill="' + color + '"/><polygon points="34,8 34,32 14,20" fill="' + color + '"/></svg>';
       case 'next':
-        return '<svg viewBox="0 0 40 40" width="80" height="80"><polygon points="6,8 26,20 6,32" fill="' + color + '"/><rect x="30" y="8" width="4" height="24" fill="' + color + '"/></svg>';
+        return '<svg viewBox="0 0 40 40" width="50" height="50"><polygon points="6,8 26,20 6,32" fill="' + color + '"/><rect x="30" y="8" width="4" height="24" fill="' + color + '"/></svg>';
       case 'playall':
-        return '<svg viewBox="0 0 40 40" width="80" height="80"><circle cx="20" cy="20" r="14" fill="none" stroke="' + color + '" stroke-width="3"/><polygon points="16,12 16,28 28,20" fill="' + color + '"/></svg>';
+        return '<svg viewBox="0 0 40 40" width="50" height="50"><circle cx="20" cy="20" r="14" fill="none" stroke="' + color + '" stroke-width="3"/><polygon points="16,12 16,28 28,20" fill="' + color + '"/></svg>';
       case 'shuffle':
-        return '<svg viewBox="0 0 40 40" width="80" height="80"><path d="M6,12 L20,12 L26,28 L34,28 M6,28 L20,28 L26,12 L34,12" fill="none" stroke="' + color + '" stroke-width="3" stroke-linecap="round"/><polyline points="30,8 34,12 30,16" fill="none" stroke="' + color + '" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/><polyline points="30,24 34,28 30,32" fill="none" stroke="' + color + '" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+        return '<svg viewBox="0 0 40 40" width="50" height="50"><path d="M6,12 L20,12 L26,28 L34,28 M6,28 L20,28 L26,12 L34,12" fill="none" stroke="' + color + '" stroke-width="3" stroke-linecap="round"/><polyline points="30,8 34,12 30,16" fill="none" stroke="' + color + '" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/><polyline points="30,24 34,28 30,32" fill="none" stroke="' + color + '" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>';
       case 'repeat':
-        return '<svg viewBox="0 0 40 40" width="80" height="80"><path d="M8,14 L8,26 Q8,30 12,30 L28,30 Q32,30 32,26 L32,14 Q32,10 28,10 L12,10" fill="none" stroke="' + color + '" stroke-width="3" stroke-linecap="round"/><polyline points="16,6 12,10 16,14" fill="none" stroke="' + color + '" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+        return '<svg viewBox="0 0 40 40" width="50" height="50"><path d="M8,14 L8,26 Q8,30 12,30 L28,30 Q32,30 32,26 L32,14 Q32,10 28,10 L12,10" fill="none" stroke="' + color + '" stroke-width="3" stroke-linecap="round"/><polyline points="16,6 12,10 16,14" fill="none" stroke="' + color + '" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+      case 'speedometer':
+        var needleX2, needleY2;
+        if (speed === 'fast') { needleX2 = 30; needleY2 = 22; }
+        else if (speed === 'medium') { needleX2 = 20; needleY2 = 10; }
+        else { needleX2 = 10; needleY2 = 22; }
+        return '<svg viewBox="0 0 40 40" width="50" height="50"><path d="M6,28 A16,16 0 1,1 34,28" fill="none" stroke="' + color + '" stroke-width="3" stroke-linecap="round"/><line x1="20" y1="22" x2="' + needleX2 + '" y2="' + needleY2 + '" stroke="' + color + '" stroke-width="3" stroke-linecap="round"/><circle cx="20" cy="22" r="3" fill="' + color + '"/></svg>';
       default:
         return '';
     }
@@ -1496,56 +1519,43 @@
     var fileInfo = getMusicFileInfo(currentPlayingFile);
     var progressPercent = playbackDuration > 0 ? (playbackElapsed / playbackDuration) * 100 : 0;
 
-    // Format time display (00:00:00 format)
-    function formatTimeHMS(seconds) {
-      var hrs = Math.floor(seconds / 3600);
-      var mins = Math.floor((seconds % 3600) / 60);
-      var secs = seconds % 60;
-      return (hrs < 10 ? '0' : '') + hrs + ':' + (mins < 10 ? '0' : '') + mins + ':' + (secs < 10 ? '0' : '') + secs;
-    }
-
-    // Build metadata line (Artist | Album | Genre)
-    var metaParts = [];
-    if (fileInfo.artist) metaParts.push(escapeHtml(fileInfo.artist));
-    if (fileInfo.album) metaParts.push(escapeHtml(fileInfo.album));
-    if (fileInfo.genre) metaParts.push(escapeHtml(fileInfo.genre));
-    var metaLine = metaParts.join(' | ');
-
     // Determine play/pause icon state
-    var playPauseIcon = isPaused ? getMusicPlayerIcon('play', true) : getMusicPlayerIcon('pause', true);
+    var playPauseIcon = isPaused ? getPlayerIcon('play', true) : getPlayerIcon('pause', true);
 
     // Fast mode display
     var rewindContent, forwardContent;
     if (musicPlayerFastMode === 'rewind') {
       var speeds = ['x2', 'x4', 'x8', 'x16', 'x32'];
-      rewindContent = '<span class="mp-fast-speed">' + speeds[musicPlayerFastSpeed] + '</span>';
+      rewindContent = '<span class="player-fast-speed">' + speeds[musicPlayerFastSpeed] + '</span>';
     } else {
-      rewindContent = getMusicPlayerIcon('rewind', true);
+      rewindContent = getPlayerIcon('rewind', true);
     }
     if (musicPlayerFastMode === 'forward') {
       var speeds = ['x2', 'x4', 'x8', 'x16', 'x32'];
-      forwardContent = '<span class="mp-fast-speed">' + speeds[musicPlayerFastSpeed] + '</span>';
+      forwardContent = '<span class="player-fast-speed">' + speeds[musicPlayerFastSpeed] + '</span>';
     } else {
-      forwardContent = getMusicPlayerIcon('forward', true);
+      forwardContent = getPlayerIcon('forward', true);
     }
 
-    // Build control icons with selection highlight
+    // Build control icons (9 controls: play/pause, rewind, forward, prev, next, playall, shuffle, repeat, slidespeed)
+    // Slidespeed is gray (not highlighted) for Music, but still functional
     var controls = [
       { id: 'playpause', content: playPauseIcon, highlight: true },
       { id: 'rewind', content: rewindContent, highlight: true },
       { id: 'forward', content: forwardContent, highlight: true },
-      { id: 'prev', content: getMusicPlayerIcon('prev', true), highlight: true },
-      { id: 'next', content: getMusicPlayerIcon('next', true), highlight: true },
-      { id: 'playall', content: getMusicPlayerIcon('playall', musicPlayerPlayAllOn), highlight: musicPlayerPlayAllOn },
-      { id: 'shuffle', content: getMusicPlayerIcon('shuffle', musicPlayerShuffleOn), highlight: musicPlayerShuffleOn },
-      { id: 'repeat', content: getMusicPlayerIcon('repeat', musicPlayerRepeatOn), highlight: musicPlayerRepeatOn }
+      { id: 'prev', content: getPlayerIcon('prev', true), highlight: true },
+      { id: 'next', content: getPlayerIcon('next', true), highlight: true },
+      { id: 'playall', content: getPlayerIcon('playall', musicPlayerPlayAllOn), highlight: musicPlayerPlayAllOn },
+      { id: 'shuffle', content: getPlayerIcon('shuffle', mediaShuffleOn), highlight: mediaShuffleOn },
+      { id: 'repeat', content: getPlayerIcon('repeat', mediaRepeatOn), highlight: mediaRepeatOn },
+      { id: 'slidespeed', content: getPlayerIcon('speedometer', false, mediaSlideSpeed), highlight: false }
     ];
 
     var controlsHtml = '';
     for (var i = 0; i < controls.length; i++) {
       var ctrl = controls[i];
       var isSelected = (musicPlayerControlIndex === i);
-      var cls = 'mp-ctrl-btn' + (isSelected ? ' mp-ctrl-selected' : '') + (ctrl.highlight ? ' mp-ctrl-on' : ' mp-ctrl-off');
+      var cls = 'player-ctrl-btn' + (isSelected ? ' player-ctrl-selected' : '') + (ctrl.highlight ? ' player-ctrl-on' : ' player-ctrl-off');
       controlsHtml += '<div class="' + cls + '" data-index="' + i + '">' + ctrl.content + '</div>';
     }
 
@@ -1554,32 +1564,23 @@
     var timerSecs = playbackElapsed % 60;
     var timerDisplay = (timerMins < 10 ? '0' : '') + timerMins + ':' + (timerSecs < 10 ? '0' : '') + timerSecs;
 
-    // Build HUD HTML conditionally based on visibility
+    // Build HUD HTML (no metadata line, just filename + counter + progress + controls)
     var hudHtml = '';
     if (musicPlayerHudVisible) {
       hudHtml =
-        '<div class="mp-hud">' +
-          '<div class="mp-art">' +
-            '<svg viewBox="0 0 180 180" width="180" height="180" xmlns="http://www.w3.org/2000/svg">' +
-              '<rect width="180" height="180" fill="#4a5568" rx="8"/>' +
-              '<text x="90" y="115" text-anchor="middle" font-size="90" fill="#fff">&#9835;</text>' +
-            '</svg>' +
+        '<div class="player-hud">' +
+          '<div class="player-hud-top">' +
+            '<div class="player-filename">' + escapeHtml(fileInfo.filename) + '</div>' +
+            '<div class="player-counter">' + (currentPlayingIndex + 1) + '/' + playableFiles.length + '</div>' +
           '</div>' +
-          '<div class="mp-info">' +
-            '<div class="mp-filename">' + escapeHtml(fileInfo.filename) + '</div>' +
-            '<div class="mp-meta">' + metaLine + '</div>' +
-            '<div class="mp-progress">' +
-              '<div class="mp-progress-bar">' +
-                '<div class="mp-progress-fill" style="width:' + progressPercent + '%"></div>' +
-              '</div>' +
-              '<div class="mp-time">' +
-                '<span>' + formatTimeHMS(playbackElapsed) + '</span>' +
-                '<span> / </span>' +
-                '<span>' + formatTimeHMS(playbackDuration) + '</span>' +
-              '</div>' +
+          '<div class="player-progress">' +
+            '<span class="player-time">' + formatDuration(playbackElapsed) + '</span>' +
+            '<div class="player-progress-bar">' +
+              '<div class="player-progress-fill" style="width:' + progressPercent + '%"></div>' +
             '</div>' +
-            '<div class="mp-controls">' + controlsHtml + '</div>' +
+            '<span class="player-time">' + formatDuration(playbackDuration) + '</span>' +
           '</div>' +
+          '<div class="player-controls">' + controlsHtml + '</div>' +
         '</div>';
     }
 
@@ -2355,85 +2356,47 @@
     }
   }
 
-  function getPhotoPlayerIcon(type, isHighlight, speed) {
-    var color = isHighlight ? '#fff' : '#8a94a6';
-    switch (type) {
-      case 'play':
-        return '<svg viewBox="0 0 40 40" width="80" height="80"><polygon points="12,8 32,20 12,32" fill="' + color + '"/></svg>';
-      case 'pause':
-        return '<svg viewBox="0 0 40 40" width="80" height="80"><rect x="10" y="8" width="7" height="24" fill="' + color + '"/><rect x="23" y="8" width="7" height="24" fill="' + color + '"/></svg>';
-      case 'prev':
-        return '<svg viewBox="0 0 40 40" width="80" height="80"><rect x="6" y="8" width="4" height="24" fill="' + color + '"/><polygon points="34,8 34,32 14,20" fill="' + color + '"/></svg>';
-      case 'next':
-        return '<svg viewBox="0 0 40 40" width="80" height="80"><polygon points="6,8 26,20 6,32" fill="' + color + '"/><rect x="30" y="8" width="4" height="24" fill="' + color + '"/></svg>';
-      case 'slideshow':
-        return '<svg viewBox="0 0 40 40" width="80" height="80"><circle cx="20" cy="20" r="14" fill="none" stroke="' + color + '" stroke-width="3"/><polygon points="16,12 16,28 28,20" fill="' + color + '"/></svg>';
-      case 'shuffle':
-        return '<svg viewBox="0 0 40 40" width="80" height="80"><path d="M6,12 L20,12 L26,28 L34,28 M6,28 L20,28 L26,12 L34,12" fill="none" stroke="' + color + '" stroke-width="3" stroke-linecap="round"/><polyline points="30,8 34,12 30,16" fill="none" stroke="' + color + '" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/><polyline points="30,24 34,28 30,32" fill="none" stroke="' + color + '" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>';
-      case 'repeat':
-        return '<svg viewBox="0 0 40 40" width="80" height="80"><path d="M8,14 L8,26 Q8,30 12,30 L28,30 Q32,30 32,26 L32,14 Q32,10 28,10 L12,10" fill="none" stroke="' + color + '" stroke-width="3" stroke-linecap="round"/><polyline points="16,6 12,10 16,14" fill="none" stroke="' + color + '" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>';
-      case 'speedometer':
-        // Needle direction based on speed: fast=right, medium=up, slow=left
-        var needleX2, needleY2;
-        if (speed === 'fast') {
-          needleX2 = 30; needleY2 = 22; // pointing right
-        } else if (speed === 'medium') {
-          needleX2 = 20; needleY2 = 10; // pointing up
-        } else {
-          needleX2 = 10; needleY2 = 22; // pointing left (slow)
-        }
-        return '<svg viewBox="0 0 40 40" width="80" height="80"><path d="M6,28 A16,16 0 1,1 34,28" fill="none" stroke="' + color + '" stroke-width="3" stroke-linecap="round"/><line x1="20" y1="22" x2="' + needleX2 + '" y2="' + needleY2 + '" stroke="' + color + '" stroke-width="3" stroke-linecap="round"/><circle cx="20" cy="22" r="3" fill="' + color + '"/><line x1="10" y1="22" x2="12" y2="22" stroke="' + color + '" stroke-width="2" stroke-linecap="round"/><line x1="28" y1="22" x2="30" y2="22" stroke="' + color + '" stroke-width="2" stroke-linecap="round"/><line x1="20" y1="10" x2="20" y2="12" stroke="' + color + '" stroke-width="2" stroke-linecap="round"/></svg>';
-      default:
-        return '';
-    }
-  }
-
   function renderPhotoPlayer() {
     if (!photoPlayerEl || !currentPlayingFile) return;
 
-    // Build control icons
-    var playPauseIcon = isPaused ? getPhotoPlayerIcon('play', true) : getPhotoPlayerIcon('pause', true);
+    // Build control icons (9 controls: play/pause, rewind, forward, prev, next, playall, shuffle, repeat, slidespeed)
+    // For Photos: rewind = prev photo, forward = next photo, slidespeed = highlighted
+    var playPauseIcon = isPaused ? getPlayerIcon('play', true) : getPlayerIcon('pause', true);
 
     var controls = [
       { id: 'playpause', content: playPauseIcon, highlight: true },
-      { id: 'prev', content: getPhotoPlayerIcon('prev', true), highlight: true },
-      { id: 'next', content: getPhotoPlayerIcon('next', true), highlight: true },
-      { id: 'slideshow', content: getPhotoPlayerIcon('slideshow', photoPlayerPlayAllOn), highlight: photoPlayerPlayAllOn },
-      { id: 'shuffle', content: getPhotoPlayerIcon('shuffle', photoPlayerShuffleOn), highlight: photoPlayerShuffleOn },
-      { id: 'repeat', content: getPhotoPlayerIcon('repeat', photoPlayerRepeatOn), highlight: photoPlayerRepeatOn },
-      { id: 'speedometer', content: getPhotoPlayerIcon('speedometer', true, photoPlayerSlideSpeed), highlight: true }
+      { id: 'rewind', content: getPlayerIcon('rewind', true), highlight: true },
+      { id: 'forward', content: getPlayerIcon('forward', true), highlight: true },
+      { id: 'prev', content: getPlayerIcon('prev', true), highlight: true },
+      { id: 'next', content: getPlayerIcon('next', true), highlight: true },
+      { id: 'playall', content: getPlayerIcon('playall', photoPlayerPlayAllOn), highlight: photoPlayerPlayAllOn },
+      { id: 'shuffle', content: getPlayerIcon('shuffle', mediaShuffleOn), highlight: mediaShuffleOn },
+      { id: 'repeat', content: getPlayerIcon('repeat', mediaRepeatOn), highlight: mediaRepeatOn },
+      { id: 'slidespeed', content: getPlayerIcon('speedometer', true, mediaSlideSpeed), highlight: true }
     ];
 
     var controlsHtml = '';
     for (var i = 0; i < controls.length; i++) {
       var ctrl = controls[i];
       var isSelected = (photoPlayerControlIndex === i);
-      var cls = 'pp-ctrl-btn' + (isSelected ? ' pp-ctrl-selected' : '') + (ctrl.highlight ? ' pp-ctrl-on' : ' pp-ctrl-off');
+      var cls = 'player-ctrl-btn' + (isSelected ? ' player-ctrl-selected' : '') + (ctrl.highlight ? ' player-ctrl-on' : ' player-ctrl-off');
       controlsHtml += '<div class="' + cls + '" data-index="' + i + '">' + ctrl.content + '</div>';
     }
-
-    // Photo info (use cached metadata to prevent jumping values)
-    var entry = currentPlayingFile;
-    var photoInfo = getPhotoFileInfo(entry, currentPlayingIndex);
-    var infoLine = photoInfo.dimensions + ' | ' + photoInfo.date + ' | ' + photoInfo.size;
 
     // Dynamic background - use currentPlayingIndex directly for variety
     var bgUrl = getPhotoBackground(currentPlayingIndex);
     var bgStyle = "background-color:#1a1a1a;background-image:url('" + bgUrl + "');background-size:cover;background-position:center;background-repeat:no-repeat";
 
-    // Build HUD HTML conditionally based on visibility
+    // Build HUD HTML (no metadata line, just filename + counter + controls)
     var hudHtml = '';
     if (photoPlayerHudVisible) {
       hudHtml =
-        '<div class="pp-hud">' +
-          '<div class="pp-info">' +
-            '<div class="pp-filename">' + escapeHtml(entry.name) + '</div>' +
-            '<div class="pp-meta">' + escapeHtml(infoLine) + '</div>' +
-            '<div class="pp-controls">' + controlsHtml + '</div>' +
+        '<div class="player-hud">' +
+          '<div class="player-hud-top">' +
+            '<div class="player-filename">' + escapeHtml(currentPlayingFile.name) + '</div>' +
+            '<div class="player-counter">' + (currentPlayingIndex + 1) + '/' + playableFiles.length + '</div>' +
           '</div>' +
-          '<div class="pp-right">' +
-            '<span class="pp-counter">' + (currentPlayingIndex + 1) + '/' + playableFiles.length + '</span>' +
-          '</div>' +
+          '<div class="player-controls">' + controlsHtml + '</div>' +
         '</div>';
     }
 
@@ -2447,12 +2410,20 @@
       case 'LEFT':
         if (photoPlayerHudVisible && photoPlayerControlIndex > 0) {
           photoPlayerControlIndex--;
+          // Restart auto-hide timer only if not locked by INFO
+          if (!photoPlayerHudLocked) {
+            startPhotoPlayerHudTimer();
+          }
           renderPhotoPlayer();
         }
         return true;
       case 'RIGHT':
-        if (photoPlayerHudVisible && photoPlayerControlIndex < 6) {
+        if (photoPlayerHudVisible && photoPlayerControlIndex < 8) {
           photoPlayerControlIndex++;
+          // Restart auto-hide timer only if not locked by INFO
+          if (!photoPlayerHudLocked) {
+            startPhotoPlayerHudTimer();
+          }
           renderPhotoPlayer();
         }
         return true;
@@ -2509,33 +2480,45 @@
       case 0: // Play/Pause
         isPaused = !isPaused;
         break;
-      case 1: // Previous
+      case 1: // Rewind = Previous photo (for Photos)
         if (playableFiles.length > 0) {
           var prevIndex = (currentPlayingIndex - 1 + playableFiles.length) % playableFiles.length;
           playPhotoAtIndex(prevIndex);
         }
         return;
-      case 2: // Next
+      case 2: // Forward = Next photo (for Photos)
         if (playableFiles.length > 0) {
           var nextIndex = (currentPlayingIndex + 1) % playableFiles.length;
           playPhotoAtIndex(nextIndex);
         }
         return;
-      case 3: // Slide show (Play All)
+      case 3: // Previous
+        if (playableFiles.length > 0) {
+          var prevIndex = (currentPlayingIndex - 1 + playableFiles.length) % playableFiles.length;
+          playPhotoAtIndex(prevIndex);
+        }
+        return;
+      case 4: // Next
+        if (playableFiles.length > 0) {
+          var nextIndex = (currentPlayingIndex + 1) % playableFiles.length;
+          playPhotoAtIndex(nextIndex);
+        }
+        return;
+      case 5: // Play All (Slideshow)
         photoPlayerPlayAllOn = !photoPlayerPlayAllOn;
         photoPlayerPlayedIndices = [];
         break;
-      case 4: // Shuffle
-        photoPlayerShuffleOn = !photoPlayerShuffleOn;
-        photoShuffleOn = photoPlayerShuffleOn;
+      case 6: // Shuffle
+        mediaShuffleOn = !mediaShuffleOn;
+        photoPlayerShuffleOn = mediaShuffleOn;
         photoPlayerPlayedIndices = [];
         break;
-      case 5: // Repeat
-        photoPlayerRepeatOn = !photoPlayerRepeatOn;
-        photoRepeatMode = photoPlayerRepeatOn ? 'repeat' : 'play-once';
+      case 7: // Repeat
+        mediaRepeatOn = !mediaRepeatOn;
+        photoPlayerRepeatOn = mediaRepeatOn;
         break;
-      case 6: // Clock (slide speed)
-        openPhotoSlidespeedMenu();
+      case 8: // Slide speed - open submenu
+        openPlayerSlidespeedMenu('photo');
         return;
     }
     renderPhotoPlayer();
@@ -2594,8 +2577,8 @@
     else if (photoSlidespeedMenuIndex === 1) photoPlayerSlideSpeed = 'medium';
     else photoPlayerSlideSpeed = 'slow';
 
-    // Sync back to options
-    photoSlideSpeed = photoPlayerSlideSpeed;
+    // Sync back to unified options
+    mediaSlideSpeed = photoPlayerSlideSpeed;
 
     // Update timer with new speed
     playbackDuration = SLIDE_SPEED_SECONDS[photoPlayerSlideSpeed] || 4;
@@ -2604,6 +2587,126 @@
     }
 
     renderPhotoSlidespeedMenu();
+  }
+
+  // Unified Player Slidespeed Menu (used by Video/Music/Photo HUD)
+  var playerSlidespeedMenuSource = null; // 'video' | 'music' | 'photo'
+  var playerSlidespeedMenuIndex = 0;
+
+  function openPlayerSlidespeedMenu(source) {
+    playerSlidespeedMenuSource = source;
+    if (mediaSlideSpeed === 'fast') playerSlidespeedMenuIndex = 0;
+    else if (mediaSlideSpeed === 'medium') playerSlidespeedMenuIndex = 1;
+    else playerSlidespeedMenuIndex = 2;
+
+    // Stop HUD auto-hide timer and keep HUD visible while in menu
+    if (source === 'video') {
+      clearVideoPlayerHudTimer();
+    } else if (source === 'music') {
+      clearMusicPlayerHudTimer();
+    } else {
+      clearPhotoPlayerHudTimer();
+    }
+
+    currentView = 'player-slidespeed-menu';
+    render();
+  }
+
+  function closePlayerSlidespeedMenu(showHud) {
+    // Return to player view
+    if (playerSlidespeedMenuSource === 'video') {
+      currentView = 'video-player';
+      if (showHud) {
+        videoPlayerHudVisible = true;
+        videoPlayerHudLocked = false;
+        startVideoPlayerHudTimer();
+      }
+    } else if (playerSlidespeedMenuSource === 'music') {
+      currentView = 'music-player';
+      if (showHud) {
+        musicPlayerHudVisible = true;
+        musicPlayerHudLocked = false;
+        startMusicPlayerHudTimer();
+      }
+    } else {
+      currentView = 'photo-player';
+      if (showHud) {
+        photoPlayerHudVisible = true;
+        photoPlayerHudLocked = false;
+        startPhotoPlayerHudTimer();
+      }
+    }
+    render();
+  }
+
+  function renderPlayerSlidespeedMenu() {
+    if (!playerSlidespeedMenuEl) return;
+
+    var fastCls = 'pp-speed-item' + (playerSlidespeedMenuIndex === 0 ? ' pp-speed-item-selected' : '');
+    var mediumCls = 'pp-speed-item' + (playerSlidespeedMenuIndex === 1 ? ' pp-speed-item-selected' : '');
+    var slowCls = 'pp-speed-item' + (playerSlidespeedMenuIndex === 2 ? ' pp-speed-item-selected' : '');
+
+    var fastCheck = (mediaSlideSpeed === 'fast') ? '<span class="pp-speed-check">&#10003;</span>' : '';
+    var mediumCheck = (mediaSlideSpeed === 'medium') ? '<span class="pp-speed-check">&#10003;</span>' : '';
+    var slowCheck = (mediaSlideSpeed === 'slow') ? '<span class="pp-speed-check">&#10003;</span>' : '';
+
+    var html = '<div class="pp-speed-dialog">' +
+      '<div class="pp-speed-header">' +
+        '<span class="pp-speed-title">Slide show speed</span>' +
+      '</div>' +
+      '<div class="pp-speed-list">' +
+        '<div class="' + fastCls + '" data-index="0">' +
+          '<span class="pp-speed-name">Fast</span>' +
+          fastCheck +
+        '</div>' +
+        '<div class="' + mediumCls + '" data-index="1">' +
+          '<span class="pp-speed-name">Medium</span>' +
+          mediumCheck +
+        '</div>' +
+        '<div class="' + slowCls + '" data-index="2">' +
+          '<span class="pp-speed-name">Slow</span>' +
+          slowCheck +
+        '</div>' +
+      '</div>' +
+    '</div>';
+
+    playerSlidespeedMenuEl.innerHTML = html;
+  }
+
+  function confirmPlayerSlidespeedMenu() {
+    if (playerSlidespeedMenuIndex === 0) mediaSlideSpeed = 'fast';
+    else if (playerSlidespeedMenuIndex === 1) mediaSlideSpeed = 'medium';
+    else mediaSlideSpeed = 'slow';
+
+    // Sync to photo player slide speed
+    photoPlayerSlideSpeed = mediaSlideSpeed;
+
+    renderPlayerSlidespeedMenu();
+  }
+
+  function handlePlayerSlidespeedMenuNav(act) {
+    switch (act) {
+      case 'UP':
+        if (playerSlidespeedMenuIndex > 0) {
+          playerSlidespeedMenuIndex--;
+          renderPlayerSlidespeedMenu();
+        }
+        return true;
+      case 'DOWN':
+        if (playerSlidespeedMenuIndex < 2) {
+          playerSlidespeedMenuIndex++;
+          renderPlayerSlidespeedMenu();
+        }
+        return true;
+      case 'OK':
+        confirmPlayerSlidespeedMenu(); // Just toggle selection, stay in menu
+        return true;
+      case 'BACK':
+        closePlayerSlidespeedMenu(true); // BACK returns to HUD
+        return true;
+      default:
+        return false;
+    }
   }
 
   function isPhotoCategory() {
@@ -3147,70 +3250,47 @@
     }
   }
 
-  function getVideoPlayerIcon(type, isHighlight) {
-    var color = isHighlight ? '#fff' : '#8a94a6';
-    switch (type) {
-      case 'play':
-        return '<svg viewBox="0 0 40 40" width="56" height="56"><polygon points="12,8 32,20 12,32" fill="' + color + '"/></svg>';
-      case 'pause':
-        return '<svg viewBox="0 0 40 40" width="56" height="56"><rect x="10" y="8" width="7" height="24" fill="' + color + '"/><rect x="23" y="8" width="7" height="24" fill="' + color + '"/></svg>';
-      case 'rewind':
-        return '<svg viewBox="0 0 40 40" width="56" height="56"><polygon points="20,8 20,32 4,20" fill="' + color + '"/><polygon points="36,8 36,32 20,20" fill="' + color + '"/></svg>';
-      case 'forward':
-        return '<svg viewBox="0 0 40 40" width="56" height="56"><polygon points="4,8 20,20 4,32" fill="' + color + '"/><polygon points="20,8 36,20 20,32" fill="' + color + '"/></svg>';
-      case 'prev':
-        return '<svg viewBox="0 0 40 40" width="56" height="56"><rect x="6" y="8" width="4" height="24" fill="' + color + '"/><polygon points="34,8 34,32 14,20" fill="' + color + '"/></svg>';
-      case 'next':
-        return '<svg viewBox="0 0 40 40" width="56" height="56"><polygon points="6,8 26,20 6,32" fill="' + color + '"/><rect x="30" y="8" width="4" height="24" fill="' + color + '"/></svg>';
-      case 'playall':
-        return '<svg viewBox="0 0 40 40" width="56" height="56"><circle cx="20" cy="20" r="14" fill="none" stroke="' + color + '" stroke-width="3"/><polygon points="16,12 16,28 28,20" fill="' + color + '"/></svg>';
-      case 'shuffle':
-        return '<svg viewBox="0 0 40 40" width="56" height="56"><path d="M6,12 L20,12 L26,28 L34,28 M6,28 L20,28 L26,12 L34,12" fill="none" stroke="' + color + '" stroke-width="3" stroke-linecap="round"/><polyline points="30,8 34,12 30,16" fill="none" stroke="' + color + '" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/><polyline points="30,24 34,28 30,32" fill="none" stroke="' + color + '" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>';
-      case 'repeat':
-        return '<svg viewBox="0 0 40 40" width="56" height="56"><path d="M8,14 L8,26 Q8,30 12,30 L28,30 Q32,30 32,26 L32,14 Q32,10 28,10 L12,10" fill="none" stroke="' + color + '" stroke-width="3" stroke-linecap="round"/><polyline points="16,6 12,10 16,14" fill="none" stroke="' + color + '" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>';
-      default:
-        return '';
-    }
-  }
-
   function renderVideoPlayer() {
     if (!videoPlayerEl || !currentPlayingFile) return;
 
     var progressPercent = playbackDuration > 0 ? (playbackElapsed / playbackDuration) * 100 : 0;
 
-    // Build control icons (7 controls: play/pause, rewind, forward, prev, next, shuffle, repeat)
-    var playPauseIcon = isPaused ? getVideoPlayerIcon('play', true) : getVideoPlayerIcon('pause', true);
+    // Build control icons (9 controls: play/pause, rewind, forward, prev, next, playall, shuffle, repeat, slidespeed)
+    var playPauseIcon = isPaused ? getPlayerIcon('play', true) : getPlayerIcon('pause', true);
 
     // Fast mode display for rewind/forward
     var rewindContent, forwardContent;
     if (videoPlayerFastMode === 'rewind') {
       var speeds = ['x2', 'x4', 'x8', 'x16', 'x32'];
-      rewindContent = '<span class="vp-fast-speed">' + speeds[videoPlayerFastSpeed] + '</span>';
+      rewindContent = '<span class="player-fast-speed">' + speeds[videoPlayerFastSpeed] + '</span>';
     } else {
-      rewindContent = getVideoPlayerIcon('rewind', true);
+      rewindContent = getPlayerIcon('rewind', true);
     }
     if (videoPlayerFastMode === 'forward') {
       var speeds = ['x2', 'x4', 'x8', 'x16', 'x32'];
-      forwardContent = '<span class="vp-fast-speed">' + speeds[videoPlayerFastSpeed] + '</span>';
+      forwardContent = '<span class="player-fast-speed">' + speeds[videoPlayerFastSpeed] + '</span>';
     } else {
-      forwardContent = getVideoPlayerIcon('forward', true);
+      forwardContent = getPlayerIcon('forward', true);
     }
 
+    // Slidespeed is gray (not highlighted) for Video/Music, but still functional
     var controls = [
       { id: 'playpause', content: playPauseIcon, highlight: true },
       { id: 'rewind', content: rewindContent, highlight: true },
       { id: 'forward', content: forwardContent, highlight: true },
-      { id: 'prev', content: getVideoPlayerIcon('prev', true), highlight: true },
-      { id: 'next', content: getVideoPlayerIcon('next', true), highlight: true },
-      { id: 'shuffle', content: getVideoPlayerIcon('shuffle', videoPlayerShuffleOn), highlight: videoPlayerShuffleOn },
-      { id: 'repeat', content: getVideoPlayerIcon('repeat', videoPlayerRepeatOn), highlight: videoPlayerRepeatOn }
+      { id: 'prev', content: getPlayerIcon('prev', true), highlight: true },
+      { id: 'next', content: getPlayerIcon('next', true), highlight: true },
+      { id: 'playall', content: getPlayerIcon('playall', videoPlayerPlayAllOn), highlight: videoPlayerPlayAllOn },
+      { id: 'shuffle', content: getPlayerIcon('shuffle', mediaShuffleOn), highlight: mediaShuffleOn },
+      { id: 'repeat', content: getPlayerIcon('repeat', mediaRepeatOn), highlight: mediaRepeatOn },
+      { id: 'slidespeed', content: getPlayerIcon('speedometer', false, mediaSlideSpeed), highlight: false }
     ];
 
     var controlsHtml = '';
     for (var i = 0; i < controls.length; i++) {
       var ctrl = controls[i];
       var isSelected = (videoPlayerControlIndex === i);
-      var cls = 'vp-ctrl-btn' + (isSelected ? ' vp-ctrl-selected' : '') + (ctrl.highlight ? ' vp-ctrl-on' : ' vp-ctrl-off');
+      var cls = 'player-ctrl-btn' + (isSelected ? ' player-ctrl-selected' : '') + (ctrl.highlight ? ' player-ctrl-on' : ' player-ctrl-off');
       controlsHtml += '<div class="' + cls + '" data-index="' + i + '">' + ctrl.content + '</div>';
     }
 
@@ -3219,23 +3299,23 @@
     var timerSecs = playbackElapsed % 60;
     var timerDisplay = (timerMins < 10 ? '0' : '') + timerMins + ':' + (timerSecs < 10 ? '0' : '') + timerSecs;
 
-    // Build HUD HTML
+    // Build HUD HTML (no metadata line, just filename + counter + progress + controls)
     var hudHtml = '';
     if (videoPlayerHudVisible) {
       hudHtml =
-        '<div class="vp-hud">' +
-          '<div class="vp-hud-top">' +
-            '<div class="vp-filename">' + escapeHtml(currentPlayingFile.name) + '</div>' +
-            '<div class="vp-counter">' + (currentPlayingIndex + 1) + '/' + playableFiles.length + '</div>' +
+        '<div class="player-hud">' +
+          '<div class="player-hud-top">' +
+            '<div class="player-filename">' + escapeHtml(currentPlayingFile.name) + '</div>' +
+            '<div class="player-counter">' + (currentPlayingIndex + 1) + '/' + playableFiles.length + '</div>' +
           '</div>' +
-          '<div class="vp-progress">' +
-            '<span class="vp-time">' + formatDuration(playbackElapsed) + '</span>' +
-            '<div class="vp-progress-bar">' +
-              '<div class="vp-progress-fill" style="width:' + progressPercent + '%"></div>' +
+          '<div class="player-progress">' +
+            '<span class="player-time">' + formatDuration(playbackElapsed) + '</span>' +
+            '<div class="player-progress-bar">' +
+              '<div class="player-progress-fill" style="width:' + progressPercent + '%"></div>' +
             '</div>' +
-            '<span class="vp-time">' + formatDuration(playbackDuration) + '</span>' +
+            '<span class="player-time">' + formatDuration(playbackDuration) + '</span>' +
           '</div>' +
-          '<div class="vp-controls">' + controlsHtml + '</div>' +
+          '<div class="player-controls">' + controlsHtml + '</div>' +
         '</div>';
     }
 
@@ -3252,12 +3332,20 @@
       case 'LEFT':
         if (videoPlayerHudVisible && videoPlayerControlIndex > 0) {
           videoPlayerControlIndex--;
+          // Restart auto-hide timer only if not locked by INFO
+          if (!videoPlayerHudLocked) {
+            startVideoPlayerHudTimer();
+          }
           renderVideoPlayer();
         }
         return true;
       case 'RIGHT':
-        if (videoPlayerHudVisible && videoPlayerControlIndex < 6) {
+        if (videoPlayerHudVisible && videoPlayerControlIndex < 8) {
           videoPlayerControlIndex++;
+          // Restart auto-hide timer only if not locked by INFO
+          if (!videoPlayerHudLocked) {
+            startVideoPlayerHudTimer();
+          }
           renderVideoPlayer();
         }
         return true;
@@ -3345,15 +3433,20 @@
           playVideoAtIndex(nextIndex);
         }
         return;
-      case 5: // Shuffle
-        videoPlayerShuffleOn = !videoPlayerShuffleOn;
-        videoShuffleOn = videoPlayerShuffleOn; // Sync to Options
+      case 5: // Play All
+        videoPlayerPlayAllOn = !videoPlayerPlayAllOn;
         videoPlayerPlayedIndices = [];
         break;
-      case 6: // Repeat
-        videoPlayerRepeatOn = !videoPlayerRepeatOn;
-        videoRepeatMode = videoPlayerRepeatOn ? 'repeat' : 'play-once'; // Sync to Options
+      case 6: // Shuffle
+        mediaShuffleOn = !mediaShuffleOn;
+        videoPlayerPlayedIndices = [];
         break;
+      case 7: // Repeat
+        mediaRepeatOn = !mediaRepeatOn;
+        break;
+      case 8: // Slide speed - open submenu
+        openPlayerSlidespeedMenu('video');
+        return;
     }
     renderVideoPlayer();
   }
@@ -3394,12 +3487,20 @@
       case 'LEFT':
         if (musicPlayerHudVisible && musicPlayerControlIndex > 0) {
           musicPlayerControlIndex--;
+          // Restart auto-hide timer only if not locked by INFO
+          if (!musicPlayerHudLocked) {
+            startMusicPlayerHudTimer();
+          }
           renderMusicPlayer();
         }
         return true;
       case 'RIGHT':
-        if (musicPlayerHudVisible && musicPlayerControlIndex < 7) {
+        if (musicPlayerHudVisible && musicPlayerControlIndex < 8) {
           musicPlayerControlIndex++;
+          // Restart auto-hide timer only if not locked by INFO
+          if (!musicPlayerHudLocked) {
+            startMusicPlayerHudTimer();
+          }
           renderMusicPlayer();
         }
         return true;
@@ -3526,21 +3627,20 @@
         return;
       case 5: // Play All
         musicPlayerPlayAllOn = !musicPlayerPlayAllOn;
-        // Reset played tracking when toggling Play All
         musicPlayerPlayedIndices = [];
         break;
       case 6: // Shuffle
-        musicPlayerShuffleOn = !musicPlayerShuffleOn;
-        // Sync back to Music Options
-        musicShuffleOn = musicPlayerShuffleOn;
-        // Reset played tracking when toggling Shuffle
+        mediaShuffleOn = !mediaShuffleOn;
+        musicPlayerShuffleOn = mediaShuffleOn;
         musicPlayerPlayedIndices = [];
         break;
       case 7: // Repeat
-        musicPlayerRepeatOn = !musicPlayerRepeatOn;
-        // Sync back to Music Options
-        musicRepeatMode = musicPlayerRepeatOn ? 'repeat' : 'play-once';
+        mediaRepeatOn = !mediaRepeatOn;
+        musicPlayerRepeatOn = mediaRepeatOn;
         break;
+      case 8: // Slide speed - open submenu
+        openPlayerSlidespeedMenu('music');
+        return;
     }
     renderMusicPlayer();
   }
@@ -3561,33 +3661,6 @@
     }
   }
 
-  function playAllMusicFromOptions() {
-    buildPlayableList();
-    if (playableFiles.length === 0) return;
-
-    var startEntry;
-    if (musicShuffleOn) {
-      var startIndex = Math.floor(Math.random() * playableFiles.length);
-      startEntry = playableFiles[startIndex];
-    } else {
-      startEntry = playableFiles[0];
-    }
-    openMusicPlayer(startEntry, true);
-  }
-
-  function playAllMusic() {
-    buildPlayableList();
-    if (playableFiles.length === 0) return;
-
-    if (musicShuffleOn) {
-      playbackMode = 'shuffle';
-      var startIndex = Math.floor(Math.random() * playableFiles.length);
-      playFileAtIndex(startIndex);
-    } else {
-      playbackMode = (musicRepeatMode === 'repeat') ? 'repeat-all' : 'single';
-      playFileAtIndex(0);
-    }
-  }
 
   function showVideoInfo() {
     var cat = CATEGORIES[selectedCategoryIndex];
@@ -3826,14 +3899,8 @@
 
   function loadCategoryContent(categoryId) {
     var categoryData = MOCK_DATA[categoryId] || {};
-
-    if (categoryId === 'music') {
-      // For music, collect all music files from all folders and sort them
-      folderEntries = collectAllMusicFiles(categoryData);
-    } else {
-      folderEntries = categoryData['root'] || [];
-    }
-
+    // All categories (video, music, photo) use the same folder structure display
+    folderEntries = categoryData['root'] || [];
     selectedFolderIndex = 0;
     scrollRowOffset = 0;
     musicListScrollOffset = 0;
@@ -4280,6 +4347,11 @@
       return false;
     }
 
+    // Handle player-slidespeed-menu view (unified for Video/Music/Photo HUD)
+    if (currentView === 'player-slidespeed-menu') {
+      return handlePlayerSlidespeedMenuNav(act);
+    }
+
     // Handle video-info-dialog view
     if (currentView === 'video-info-dialog') {
       switch (act) {
@@ -4556,46 +4628,9 @@
           'background:linear-gradient(135deg,#1a1a2e 0%,#16213e 50%,#2d132c 100%)}' +
         '.mp-timer{font-size:14rem;font-weight:200;color:rgba(255,255,255,.12);' +
           'font-family:"Segoe UI Light","Segoe UI",sans-serif;letter-spacing:12px;user-select:none}' +
-        '.mp-hud{position:absolute;bottom:60px;left:80px;right:80px;' +
-          'background:rgba(74,85,104,0.95);border-radius:16px;display:flex;flex-direction:row;' +
-          'padding:24px 32px;gap:32px;box-shadow:0 8px 40px rgba(0,0,0,.6)}' +
-        '.mp-art{width:180px;height:180px;flex-shrink:0;border-radius:12px;overflow:hidden;' +
-          'background:#4a5568;display:flex;align-items:center;justify-content:center}' +
-        '.mp-art svg{display:block}' +
-        '.mp-info{flex:1;display:flex;flex-direction:column;justify-content:center;gap:12px}' +
-        '.mp-filename{color:#fff;font-size:2rem;font-weight:600;' +
-          'overflow:hidden;text-overflow:ellipsis;white-space:nowrap}' +
-        '.mp-meta{color:#cbd5e0;font-size:1.3rem;' +
-          'overflow:hidden;text-overflow:ellipsis;white-space:nowrap}' +
-        '.mp-progress{display:flex;flex-direction:column;gap:8px}' +
-        '.mp-progress-bar{height:8px;background:#2d3748;border-radius:4px;overflow:hidden}' +
-        '.mp-progress-fill{height:100%;background:linear-gradient(90deg,#3182ce,#ffc239);border-radius:4px;' +
-          'transition:width .3s ease-out}' +
-        '.mp-time{display:flex;justify-content:flex-end;gap:4px;color:#a0aec0;font-size:1.2rem}' +
-        '.mp-controls{display:flex;flex-direction:row;align-items:center;justify-content:center;gap:32px;margin-top:16px}' +
-        '.mp-ctrl-btn{width:100px;height:100px;display:flex;align-items:center;justify-content:center;' +
-          'border-radius:12px;cursor:pointer;transition:all .15s;border:3px solid transparent}' +
-        '.mp-ctrl-btn:hover{background:rgba(255,255,255,.1)}' +
-        '.mp-ctrl-btn.mp-ctrl-selected{background:#3182ce;border-color:#fff}' +
-        '.mp-ctrl-btn.mp-ctrl-off svg{opacity:.5}' +
-        '.mp-fast-speed{color:#fff;font-size:2.4rem;font-weight:700}' +
         // Photo Player styles
         '.photo-player-view{position:absolute;inset:0;display:none;flex-direction:column;background:#0d0f14}' +
         '.pp-bg{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background-size:cover;background-position:center}' +
-        '.pp-hud{position:absolute;bottom:60px;left:80px;right:80px;' +
-          'background:rgba(74,85,104,0.95);border-radius:16px;display:flex;flex-direction:row;' +
-          'padding:24px 32px;gap:32px;box-shadow:0 8px 40px rgba(0,0,0,.6);align-items:center}' +
-        '.pp-info{flex:1;display:flex;flex-direction:column;justify-content:center;gap:12px}' +
-        '.pp-filename{color:#fff;font-size:1.8rem;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}' +
-        '.pp-meta{color:#cbd5e0;font-size:1.2rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}' +
-        '.pp-controls{display:flex;flex-direction:row;align-items:center;justify-content:center;gap:32px;margin-top:16px}' +
-        '.pp-ctrl-btn{width:100px;height:100px;display:flex;align-items:center;justify-content:center;' +
-          'border-radius:12px;cursor:pointer;transition:all .15s;border:3px solid transparent}' +
-        '.pp-ctrl-btn:hover{background:rgba(255,255,255,.1)}' +
-        '.pp-ctrl-btn.pp-ctrl-selected{background:#3182ce;border-color:#fff}' +
-        '.pp-ctrl-btn.pp-ctrl-off svg{opacity:.5}' +
-        '.pp-right{display:flex;align-items:center;gap:16px}' +
-        '.pp-counter{color:#a0aec0;font-size:1.4rem}' +
         // Photo slide speed menu in player
         '.photo-slidespeed-menu{position:absolute;inset:0;display:none;align-items:center;justify-content:center;' +
           'background:rgba(0,0,0,.7);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}' +
@@ -4611,6 +4646,9 @@
         '.pp-speed-name{flex:1;font-size:1.4rem;font-weight:500}' +
         '.pp-speed-check{font-size:1.4rem;color:#e2e8f0}' +
         '.pp-speed-item.pp-speed-item-selected .pp-speed-check{color:#fff}' +
+        // Player slide speed menu (unified for Video/Music/Photo HUD)
+        '.player-slidespeed-menu{position:absolute;inset:0;display:none;align-items:center;justify-content:center;' +
+          'background:rgba(0,0,0,.7);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}' +
         // Photo Player Info dialog
         '.photo-player-info{position:absolute;inset:0;display:none;align-items:center;justify-content:center;' +
           'background:rgba(0,0,0,.7);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}' +
@@ -4642,23 +4680,24 @@
         '.vp-timer{font-size:14rem;font-weight:200;color:rgba(255,255,255,.12);' +
           'font-family:"Segoe UI Light","Segoe UI",sans-serif;letter-spacing:12px;user-select:none}' +
         '.vp-pause-icon{position:absolute;font-size:8rem;color:rgba(255,255,255,.3)}' +
-        '.vp-hud{position:absolute;bottom:60px;left:80px;right:80px;' +
+        // Unified Player HUD styles (shared across Video/Photo/Music)
+        '.player-hud{position:absolute;bottom:60px;left:80px;right:80px;' +
           'background:rgba(74,85,104,0.95);border-radius:16px;display:flex;flex-direction:column;' +
-          'padding:24px 32px;gap:16px;box-shadow:0 8px 40px rgba(0,0,0,.6)}' +
-        '.vp-hud-top{display:flex;flex-direction:row;justify-content:space-between;align-items:center}' +
-        '.vp-filename{color:#fff;font-size:1.8rem;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1}' +
-        '.vp-counter{color:#a0aec0;font-size:1.4rem;margin-left:24px}' +
-        '.vp-progress{display:flex;flex-direction:row;align-items:center;gap:16px}' +
-        '.vp-time{color:#a0aec0;font-size:1.2rem;min-width:50px;text-align:center}' +
-        '.vp-progress-bar{flex:1;height:8px;background:#2d3748;border-radius:4px;overflow:hidden}' +
-        '.vp-progress-fill{height:100%;background:linear-gradient(90deg,#3182ce,#ffc239);border-radius:4px;transition:width .3s ease-out}' +
-        '.vp-controls{display:flex;flex-direction:row;align-items:center;justify-content:center;gap:24px;margin-top:8px}' +
-        '.vp-ctrl-btn{width:80px;height:80px;display:flex;align-items:center;justify-content:center;' +
-          'border-radius:10px;cursor:pointer;transition:all .15s;border:3px solid transparent}' +
-        '.vp-ctrl-btn:hover{background:rgba(255,255,255,.1)}' +
-        '.vp-ctrl-btn.vp-ctrl-selected{background:#3182ce;border-color:#fff}' +
-        '.vp-ctrl-btn.vp-ctrl-off svg{opacity:.5}' +
-        '.vp-fast-speed{color:#fff;font-size:1.8rem;font-weight:700}' +
+          'padding:20px 28px;gap:12px;box-shadow:0 8px 40px rgba(0,0,0,.6)}' +
+        '.player-hud-top{display:flex;flex-direction:row;justify-content:space-between;align-items:center}' +
+        '.player-filename{color:#fff;font-size:1.6rem;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1}' +
+        '.player-counter{color:#a0aec0;font-size:1.3rem;margin-left:20px}' +
+        '.player-progress{display:flex;flex-direction:row;align-items:center;gap:12px}' +
+        '.player-time{color:#a0aec0;font-size:1.1rem;min-width:45px;text-align:center}' +
+        '.player-progress-bar{flex:1;height:6px;background:#2d3748;border-radius:3px;overflow:hidden}' +
+        '.player-progress-fill{height:100%;background:linear-gradient(90deg,#3182ce,#ffc239);border-radius:3px;transition:width .3s ease-out}' +
+        '.player-controls{display:flex;flex-direction:row;align-items:center;justify-content:center;gap:12px;margin-top:8px}' +
+        '.player-ctrl-btn{width:60px;height:60px;display:flex;align-items:center;justify-content:center;' +
+          'border-radius:8px;cursor:pointer;transition:all .15s;border:2px solid transparent}' +
+        '.player-ctrl-btn:hover{background:rgba(255,255,255,.1)}' +
+        '.player-ctrl-btn.player-ctrl-selected{background:#3182ce;border-color:#fff}' +
+        '.player-ctrl-btn.player-ctrl-off svg{opacity:.5}' +
+        '.player-fast-speed{color:#fff;font-size:1.4rem;font-weight:700}' +
         '</style>' +
         '<div class="usb-root">' +
           '<div class="usb-player">' +
@@ -4684,6 +4723,7 @@
             '<div class="music-player-view"></div>' +
             '<div class="photo-player-view"></div>' +
             '<div class="photo-slidespeed-menu"></div>' +
+            '<div class="player-slidespeed-menu"></div>' +
             '<div class="photo-player-info"></div>' +
             '<div class="video-info-dialog"></div>' +
             '<div class="video-player-view"></div>' +
@@ -4708,6 +4748,7 @@
       photoPlayerEl = el.querySelector('.photo-player-view');
       photoSlidespeedMenuEl = el.querySelector('.photo-slidespeed-menu');
       photoPlayerInfoEl = el.querySelector('.photo-player-info');
+      playerSlidespeedMenuEl = el.querySelector('.player-slidespeed-menu');
       videoInfoDialogEl = el.querySelector('.video-info-dialog');
       videoPlayerEl = el.querySelector('.video-player-view');
     },
