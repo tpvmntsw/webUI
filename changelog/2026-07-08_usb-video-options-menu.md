@@ -142,8 +142,68 @@ Video Info dialog:
 
 ## Differences from Photo Options
 - No "Slide show speed" option (not applicable to video)
-- Uses existing video player instead of dedicated photo player
-- Play all triggers video playback (not slideshow)
+- Video Player has 5 controls (no speed icon): Play/Pause, Prev, Next, Shuffle, Repeat
+- Video HUD layout: filename + counter on top row, progress bar with time, controls row
+
+## Video Player
+Added dedicated Video Player (similar to Photo Player) with the following features:
+
+### Video Player State Variables
+- `videoPlayerEl` - DOM element for Video Player
+- `videoPlayerControlIndex` - Current control selection (0-4)
+- `videoPlayerPlayAllOn` - Play all mode toggle
+- `videoPlayerShuffleOn` - Shuffle state (syncs with Options)
+- `videoPlayerRepeatOn` - Repeat state (syncs with Options)
+- `videoPlayerReturnToIndex` - Index to return to after closing
+- `videoPlayerFromPlayAll` - Whether entered via Play all
+- `videoPlayerPlayedIndices` - Tracks played videos for shuffle
+- `videoPlayerHudVisible` - HUD visibility state
+- `videoPlayerHudTimer` - Auto-hide timer
+- `videoPlayerHudLocked` - HUD locked by INFO key
+
+### Video Player Controls (5 icons)
+1. Play/Pause - Toggle playback
+2. Previous - Go to previous video
+3. Next - Go to next video
+4. Shuffle - Toggle shuffle (syncs with Video Options)
+5. Repeat - Toggle repeat (syncs with Video Options)
+
+### Video Player HUD Layout
+- Top row: Filename (left) + Counter "X/Y" (right)
+- Middle row: Time elapsed + Progress bar + Total duration
+- Bottom row: 5 control icons (wider spacing than Photo Player)
+- Background: Animated gradient (blue tones)
+- Large timer display in background
+
+### Video Player Navigation
+- LEFT/RIGHT: Move between controls
+- OK: Activate selected control (or show HUD if hidden)
+- PLAY: Resume playback
+- PAUSE: Pause playback
+- BACK: Exit player
+- INFO: Toggle HUD visibility
+
+### Sync Behavior
+- Shuffle and Repeat settings sync bidirectionally between Video Options and Video Player
+- Changes in Player update Options settings
+- Changes in Options apply to new Player sessions
+
+### Video Player CSS Classes
+- `.video-player-view` - Main container
+- `.vp-bg` - Background with gradient
+- `.vp-timer` - Large timer display
+- `.vp-pause-icon` - Pause indicator
+- `.vp-hud` - Bottom HUD container
+- `.vp-hud-top` - Top row (filename + counter)
+- `.vp-filename` - Video filename display
+- `.vp-counter` - Video counter (X/Y)
+- `.vp-progress` - Progress bar row
+- `.vp-time` - Time display
+- `.vp-progress-bar` / `.vp-progress-fill` - Progress bar
+- `.vp-controls` - Control icons container
+- `.vp-ctrl-btn` - Individual control button
+- `.vp-ctrl-selected` - Selected control highlight
+- `.vp-ctrl-off` - Inactive state
 
 ## Testing
 - Smoke tests: 26 passed, 0 failed

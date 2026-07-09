@@ -38,7 +38,7 @@
 
   var usbDevices = [];
   var selectedDeviceIndex = 0;
-  // 'idle' | 'devices' | 'split' | 'playing' | 'option-menu' | 'video-info' | 'music-options' | 'music-repeat-submenu' | 'music-player' | 'photo-options' | 'photo-viewmode-submenu' | 'photo-repeat-submenu' | 'photo-slidespeed-submenu' | 'photo-player' | 'photo-info' | 'photo-slidespeed-menu' | 'photo-player-info' | 'video-options' | 'video-viewmode-submenu' | 'video-repeat-submenu' | 'video-info-dialog'
+  // 'idle' | 'devices' | 'split' | 'playing' | 'option-menu' | 'video-info' | 'music-options' | 'music-repeat-submenu' | 'music-player' | 'photo-options' | 'photo-viewmode-submenu' | 'photo-repeat-submenu' | 'photo-slidespeed-submenu' | 'photo-player' | 'photo-info' | 'photo-slidespeed-menu' | 'photo-player-info' | 'video-options' | 'video-viewmode-submenu' | 'video-repeat-submenu' | 'video-info-dialog' | 'video-player'
   var currentView = 'idle';
   var musicPlayerEl = null;
   var photoOptionsEl = null;
@@ -112,6 +112,21 @@
   var videoRepeatSubmenuIndex = 0;
   var videoOptionsFromLeftPanel = false;
   var videoInfoDialogEl = null;
+
+  // Video Player state
+  var videoPlayerEl = null;
+  var videoPlayerControlIndex = 0; // 0-6: play/pause, rewind, forward, prev, next, shuffle, repeat (7 controls)
+  var videoPlayerPlayAllOn = false;
+  var videoPlayerShuffleOn = false;
+  var videoPlayerRepeatOn = false; // false = play once, true = repeat
+  var videoPlayerReturnToIndex = 0;
+  var videoPlayerFromPlayAll = false;
+  var videoPlayerPlayedIndices = [];
+  var videoPlayerHudVisible = true;
+  var videoPlayerHudTimer = null;
+  var videoPlayerHudLocked = false;
+  var videoPlayerFastMode = null; // null | 'rewind' | 'forward'
+  var videoPlayerFastSpeed = 0; // 0=x2, 1=x4, 2=x8, 3=x16, 4=x32
 
   // Photo Player state
   var photoPlayerControlIndex = 0; // 0-5: play/pause, prev, next, shuffle, repeat, slidespeed
@@ -530,7 +545,7 @@
   };
 
   function render() {
-    if (!idleEl || !deviceListEl || !splitViewEl || !playerViewEl || !optionMenuEl || !videoInfoEl || !fullscreenEl || !windowEl || !musicOptionsEl || !musicRepeatSubmenuEl || !musicPlayerEl || !photoOptionsEl || !photoViewmodeSubmenuEl || !photoRepeatSubmenuEl || !photoSlidespeedSubmenuEl || !photoPlayerEl || !photoInfoEl || !photoSlidespeedMenuEl || !photoPlayerInfoEl || !videoOptionsEl || !videoViewmodeSubmenuEl || !videoRepeatSubmenuEl || !videoInfoDialogEl) return;
+    if (!idleEl || !deviceListEl || !splitViewEl || !playerViewEl || !optionMenuEl || !videoInfoEl || !fullscreenEl || !windowEl || !musicOptionsEl || !musicRepeatSubmenuEl || !musicPlayerEl || !photoOptionsEl || !photoViewmodeSubmenuEl || !photoRepeatSubmenuEl || !photoSlidespeedSubmenuEl || !photoPlayerEl || !photoInfoEl || !photoSlidespeedMenuEl || !photoPlayerInfoEl || !videoOptionsEl || !videoViewmodeSubmenuEl || !videoRepeatSubmenuEl || !videoInfoDialogEl || !videoPlayerEl) return;
 
     // Hide all views
     idleEl.style.display = 'none';
@@ -554,6 +569,7 @@
     videoViewmodeSubmenuEl.style.display = 'none';
     videoRepeatSubmenuEl.style.display = 'none';
     videoInfoDialogEl.style.display = 'none';
+    videoPlayerEl.style.display = 'none';
 
     // Determine if we're in fullscreen mode (split/playing/option-menu/video-info/music-options/music-repeat-submenu/music-player/photo-*/video-*)
     var isFullscreenView = (currentView === 'split' || currentView === 'playing' ||
@@ -566,7 +582,8 @@
                             currentView === 'photo-slidespeed-menu' ||
                             currentView === 'photo-player-info' ||
                             currentView === 'video-options' || currentView === 'video-viewmode-submenu' ||
-                            currentView === 'video-repeat-submenu' || currentView === 'video-info-dialog');
+                            currentView === 'video-repeat-submenu' || currentView === 'video-info-dialog' ||
+                            currentView === 'video-player');
 
     // Toggle between windowed (idle/devices) and fullscreen (split/playing) containers
     windowEl.style.display = isFullscreenView ? 'none' : 'flex';
@@ -691,6 +708,9 @@
       renderLeftPanel();
       renderRightPanel();
       renderVideoInfoDialog();
+    } else if (currentView === 'video-player') {
+      videoPlayerEl.style.display = 'flex';
+      renderVideoPlayer();
     }
   }
 
@@ -2814,19 +2834,80 @@
     } else {
       startEntry = playableFiles[0];
     }
+    openVideoPlayer(startEntry, true);
+  }
 
-    // Update playback mode based on options
-    if (videoShuffleOn) {
-      playbackMode = 'shuffle';
-    } else if (videoRepeatMode === 'repeat') {
-      playbackMode = 'repeat-all';
-    } else {
-      playbackMode = 'single';
+  // Video Player HUD visibility functions
+  function clearVideoPlayerHudTimer() {
+    if (videoPlayerHudTimer) {
+      clearTimeout(videoPlayerHudTimer);
+      videoPlayerHudTimer = null;
     }
+  }
 
+  function startVideoPlayerHudTimer() {
+    clearVideoPlayerHudTimer();
+    if (videoPlayerHudLocked) return;
+    videoPlayerHudTimer = setTimeout(function() {
+      videoPlayerHudVisible = false;
+      videoPlayerHudTimer = null;
+      renderVideoPlayer();
+    }, HUD_AUTO_HIDE_DELAY);
+  }
+
+  function showVideoPlayerHud(locked) {
+    videoPlayerHudVisible = true;
+    videoPlayerHudLocked = locked || false;
+    if (!locked) {
+      startVideoPlayerHudTimer();
+    } else {
+      clearVideoPlayerHudTimer();
+    }
+    renderVideoPlayer();
+  }
+
+  function hideVideoPlayerHud() {
+    clearVideoPlayerHudTimer();
+    videoPlayerHudVisible = false;
+    videoPlayerHudLocked = false;
+    renderVideoPlayer();
+  }
+
+  function toggleVideoPlayerHudByInfo() {
+    if (videoPlayerHudVisible) {
+      hideVideoPlayerHud();
+    } else {
+      showVideoPlayerHud(true);
+    }
+  }
+
+  function resetVideoPlayerHudOnPlayPause() {
+    videoPlayerHudLocked = false;
+    showVideoPlayerHud(false);
+  }
+
+  // Video Player functions
+  function openVideoPlayer(entry, fromPlayAll) {
+    videoPlayerFromPlayAll = fromPlayAll || false;
+    videoPlayerReturnToIndex = selectedFolderIndex;
+    videoPlayerControlIndex = 0;
+    videoPlayerPlayedIndices = [];
+    videoPlayerFastMode = null;
+    videoPlayerFastSpeed = 0;
+
+    // Sync options state
+    if (fromPlayAll) {
+      videoPlayerPlayAllOn = true;
+    } else {
+      videoPlayerPlayAllOn = false;
+    }
+    videoPlayerShuffleOn = videoShuffleOn;
+    videoPlayerRepeatOn = (videoRepeatMode === 'repeat');
+
+    buildPlayableVideoList();
     currentPlayingIndex = -1;
     for (var i = 0; i < playableFiles.length; i++) {
-      if (playableFiles[i].name === startEntry.name) {
+      if (playableFiles[i].name === entry.name) {
         currentPlayingIndex = i;
         break;
       }
@@ -2834,10 +2915,367 @@
     if (currentPlayingIndex === -1 && playableFiles.length > 0) {
       currentPlayingIndex = 0;
     }
-    currentPlayingFile = startEntry;
-    currentView = 'playing';
-    startPlaybackTimer();
+    currentPlayingFile = entry;
+    currentView = 'video-player';
+    videoPlayerHudVisible = true;
+    videoPlayerHudLocked = false;
+    startVideoPlayerTimer();
     render();
+    startVideoPlayerHudTimer();
+  }
+
+  function closeVideoPlayer() {
+    stopPlaybackTimer();
+    clearVideoPlayerHudTimer();
+    videoPlayerFastMode = null;
+    videoPlayerFastSpeed = 0;
+
+    if (currentPlayingIndex >= 0 && currentPlayingIndex < playableFiles.length) {
+      var lastPlayedFile = playableFiles[currentPlayingIndex];
+      for (var i = 0; i < folderEntries.length; i++) {
+        if (folderEntries[i].name === lastPlayedFile.name) {
+          selectedFolderIndex = i;
+          break;
+        }
+      }
+    } else {
+      selectedFolderIndex = videoPlayerReturnToIndex;
+    }
+
+    currentPlayingFile = null;
+    currentPlayingIndex = -1;
+    playbackElapsed = 0;
+    playbackDuration = 0;
+    isPaused = false;
+    videoPlayerPlayAllOn = false;
+
+    updateScrollOffset();
+    currentView = 'split';
+    render();
+  }
+
+  function startVideoPlayerTimer() {
+    stopPlaybackTimer();
+    if (!currentPlayingFile) return;
+
+    playbackDuration = getFileDuration(currentPlayingFile.name);
+    playbackElapsed = 0;
+    isPaused = false;
+
+    playbackTimer = setInterval(function() {
+      if (!isPaused && videoPlayerFastMode === null) {
+        playbackElapsed++;
+        if (playbackElapsed >= playbackDuration) {
+          onVideoPlayerComplete();
+          return;
+        }
+      } else if (videoPlayerFastMode === 'rewind') {
+        var speeds = [2, 4, 8, 16, 32];
+        var delta = speeds[videoPlayerFastSpeed];
+        playbackElapsed = Math.max(0, playbackElapsed - delta);
+        if (playbackElapsed <= 0) {
+          playbackElapsed = 0;
+        }
+      } else if (videoPlayerFastMode === 'forward') {
+        var speeds = [2, 4, 8, 16, 32];
+        var delta = speeds[videoPlayerFastSpeed];
+        playbackElapsed = Math.min(playbackDuration - 1, playbackElapsed + delta);
+        if (playbackElapsed >= playbackDuration - 1) {
+          onVideoPlayerComplete();
+          return;
+        }
+      }
+      if (currentView === 'video-player') {
+        renderVideoPlayer();
+      }
+    }, 1000);
+  }
+
+  function onVideoPlayerComplete() {
+    stopPlaybackTimer();
+
+    // Case 1: No Play all, no Repeat - stop
+    if (!videoPlayerPlayAllOn && !videoPlayerRepeatOn) {
+      closeVideoPlayer();
+      return;
+    }
+
+    // Case 2: Only Repeat (no Play all) - repeat current video
+    if (!videoPlayerPlayAllOn && videoPlayerRepeatOn) {
+      playbackElapsed = 0;
+      startVideoPlayerTimer();
+      return;
+    }
+
+    // Case 3: Play all
+    if (videoPlayerPlayAllOn) {
+      if (videoPlayerPlayedIndices.indexOf(currentPlayingIndex) === -1) {
+        videoPlayerPlayedIndices.push(currentPlayingIndex);
+      }
+
+      var nextIndex = -1;
+
+      if (videoPlayerShuffleOn) {
+        var unplayedIndices = [];
+        for (var i = 0; i < playableFiles.length; i++) {
+          if (videoPlayerPlayedIndices.indexOf(i) === -1) {
+            unplayedIndices.push(i);
+          }
+        }
+
+        if (unplayedIndices.length > 0) {
+          var randomIdx = Math.floor(Math.random() * unplayedIndices.length);
+          nextIndex = unplayedIndices[randomIdx];
+        } else {
+          if (videoPlayerRepeatOn) {
+            videoPlayerPlayedIndices = [];
+            var randomIdx = Math.floor(Math.random() * playableFiles.length);
+            nextIndex = randomIdx;
+          } else {
+            closeVideoPlayer();
+            return;
+          }
+        }
+      } else {
+        nextIndex = currentPlayingIndex + 1;
+
+        if (nextIndex >= playableFiles.length) {
+          if (videoPlayerRepeatOn) {
+            videoPlayerPlayedIndices = [];
+            nextIndex = 0;
+          } else {
+            closeVideoPlayer();
+            return;
+          }
+        }
+      }
+
+      if (nextIndex >= 0) {
+        playVideoAtIndex(nextIndex);
+      }
+    }
+  }
+
+  function playVideoAtIndex(index) {
+    if (index >= 0 && index < playableFiles.length) {
+      stopPlaybackTimer();
+      currentPlayingIndex = index;
+      currentPlayingFile = playableFiles[index];
+      videoPlayerReturnToIndex = findFolderEntryIndex(currentPlayingFile.name);
+      startVideoPlayerTimer();
+      renderVideoPlayer();
+    }
+  }
+
+  function getVideoPlayerIcon(type, isHighlight) {
+    var color = isHighlight ? '#fff' : '#8a94a6';
+    switch (type) {
+      case 'play':
+        return '<svg viewBox="0 0 40 40" width="56" height="56"><polygon points="12,8 32,20 12,32" fill="' + color + '"/></svg>';
+      case 'pause':
+        return '<svg viewBox="0 0 40 40" width="56" height="56"><rect x="10" y="8" width="7" height="24" fill="' + color + '"/><rect x="23" y="8" width="7" height="24" fill="' + color + '"/></svg>';
+      case 'rewind':
+        return '<svg viewBox="0 0 40 40" width="56" height="56"><polygon points="20,8 20,32 4,20" fill="' + color + '"/><polygon points="36,8 36,32 20,20" fill="' + color + '"/></svg>';
+      case 'forward':
+        return '<svg viewBox="0 0 40 40" width="56" height="56"><polygon points="4,8 20,20 4,32" fill="' + color + '"/><polygon points="20,8 36,20 20,32" fill="' + color + '"/></svg>';
+      case 'prev':
+        return '<svg viewBox="0 0 40 40" width="56" height="56"><rect x="6" y="8" width="4" height="24" fill="' + color + '"/><polygon points="34,8 34,32 14,20" fill="' + color + '"/></svg>';
+      case 'next':
+        return '<svg viewBox="0 0 40 40" width="56" height="56"><polygon points="6,8 26,20 6,32" fill="' + color + '"/><rect x="30" y="8" width="4" height="24" fill="' + color + '"/></svg>';
+      case 'playall':
+        return '<svg viewBox="0 0 40 40" width="56" height="56"><circle cx="20" cy="20" r="14" fill="none" stroke="' + color + '" stroke-width="3"/><polygon points="16,12 16,28 28,20" fill="' + color + '"/></svg>';
+      case 'shuffle':
+        return '<svg viewBox="0 0 40 40" width="56" height="56"><path d="M6,12 L20,12 L26,28 L34,28 M6,28 L20,28 L26,12 L34,12" fill="none" stroke="' + color + '" stroke-width="3" stroke-linecap="round"/><polyline points="30,8 34,12 30,16" fill="none" stroke="' + color + '" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/><polyline points="30,24 34,28 30,32" fill="none" stroke="' + color + '" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+      case 'repeat':
+        return '<svg viewBox="0 0 40 40" width="56" height="56"><path d="M8,14 L8,26 Q8,30 12,30 L28,30 Q32,30 32,26 L32,14 Q32,10 28,10 L12,10" fill="none" stroke="' + color + '" stroke-width="3" stroke-linecap="round"/><polyline points="16,6 12,10 16,14" fill="none" stroke="' + color + '" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+      default:
+        return '';
+    }
+  }
+
+  function renderVideoPlayer() {
+    if (!videoPlayerEl || !currentPlayingFile) return;
+
+    var progressPercent = playbackDuration > 0 ? (playbackElapsed / playbackDuration) * 100 : 0;
+
+    // Build control icons (7 controls: play/pause, rewind, forward, prev, next, shuffle, repeat)
+    var playPauseIcon = isPaused ? getVideoPlayerIcon('play', true) : getVideoPlayerIcon('pause', true);
+
+    // Fast mode display for rewind/forward
+    var rewindContent, forwardContent;
+    if (videoPlayerFastMode === 'rewind') {
+      var speeds = ['x2', 'x4', 'x8', 'x16', 'x32'];
+      rewindContent = '<span class="vp-fast-speed">' + speeds[videoPlayerFastSpeed] + '</span>';
+    } else {
+      rewindContent = getVideoPlayerIcon('rewind', true);
+    }
+    if (videoPlayerFastMode === 'forward') {
+      var speeds = ['x2', 'x4', 'x8', 'x16', 'x32'];
+      forwardContent = '<span class="vp-fast-speed">' + speeds[videoPlayerFastSpeed] + '</span>';
+    } else {
+      forwardContent = getVideoPlayerIcon('forward', true);
+    }
+
+    var controls = [
+      { id: 'playpause', content: playPauseIcon, highlight: true },
+      { id: 'rewind', content: rewindContent, highlight: true },
+      { id: 'forward', content: forwardContent, highlight: true },
+      { id: 'prev', content: getVideoPlayerIcon('prev', true), highlight: true },
+      { id: 'next', content: getVideoPlayerIcon('next', true), highlight: true },
+      { id: 'shuffle', content: getVideoPlayerIcon('shuffle', videoPlayerShuffleOn), highlight: videoPlayerShuffleOn },
+      { id: 'repeat', content: getVideoPlayerIcon('repeat', videoPlayerRepeatOn), highlight: videoPlayerRepeatOn }
+    ];
+
+    var controlsHtml = '';
+    for (var i = 0; i < controls.length; i++) {
+      var ctrl = controls[i];
+      var isSelected = (videoPlayerControlIndex === i);
+      var cls = 'vp-ctrl-btn' + (isSelected ? ' vp-ctrl-selected' : '') + (ctrl.highlight ? ' vp-ctrl-on' : ' vp-ctrl-off');
+      controlsHtml += '<div class="' + cls + '" data-index="' + i + '">' + ctrl.content + '</div>';
+    }
+
+    // Large timer display
+    var timerMins = Math.floor(playbackElapsed / 60);
+    var timerSecs = playbackElapsed % 60;
+    var timerDisplay = (timerMins < 10 ? '0' : '') + timerMins + ':' + (timerSecs < 10 ? '0' : '') + timerSecs;
+
+    // Build HUD HTML
+    var hudHtml = '';
+    if (videoPlayerHudVisible) {
+      hudHtml =
+        '<div class="vp-hud">' +
+          '<div class="vp-hud-top">' +
+            '<div class="vp-filename">' + escapeHtml(currentPlayingFile.name) + '</div>' +
+            '<div class="vp-counter">' + (currentPlayingIndex + 1) + '/' + playableFiles.length + '</div>' +
+          '</div>' +
+          '<div class="vp-progress">' +
+            '<span class="vp-time">' + formatDuration(playbackElapsed) + '</span>' +
+            '<div class="vp-progress-bar">' +
+              '<div class="vp-progress-fill" style="width:' + progressPercent + '%"></div>' +
+            '</div>' +
+            '<span class="vp-time">' + formatDuration(playbackDuration) + '</span>' +
+          '</div>' +
+          '<div class="vp-controls">' + controlsHtml + '</div>' +
+        '</div>';
+    }
+
+    videoPlayerEl.innerHTML =
+      '<div class="vp-bg">' +
+        '<div class="vp-timer">' + timerDisplay + '</div>' +
+        (isPaused ? '<div class="vp-pause-icon">&#10074;&#10074;</div>' : '') +
+      '</div>' +
+      hudHtml;
+  }
+
+  function handleVideoPlayerNav(act) {
+    switch (act) {
+      case 'LEFT':
+        if (videoPlayerHudVisible && videoPlayerControlIndex > 0) {
+          videoPlayerControlIndex--;
+          renderVideoPlayer();
+        }
+        return true;
+      case 'RIGHT':
+        if (videoPlayerHudVisible && videoPlayerControlIndex < 6) {
+          videoPlayerControlIndex++;
+          renderVideoPlayer();
+        }
+        return true;
+      case 'OK':
+        if (videoPlayerHudVisible) {
+          resetVideoPlayerHudOnPlayPause();
+          handleVideoPlayerOK();
+        } else {
+          resetVideoPlayerHudOnPlayPause();
+        }
+        return true;
+      case 'PLAY':
+        if (videoPlayerHudVisible) {
+          resetVideoPlayerHudOnPlayPause();
+        } else {
+          resetVideoPlayerHudOnPlayPause();
+        }
+        if (isPaused) {
+          isPaused = false;
+          renderVideoPlayer();
+        }
+        return true;
+      case 'PAUSE':
+        if (videoPlayerHudVisible) {
+          resetVideoPlayerHudOnPlayPause();
+        } else {
+          resetVideoPlayerHudOnPlayPause();
+        }
+        if (!isPaused) {
+          isPaused = true;
+          renderVideoPlayer();
+        }
+        return true;
+      case 'BACK':
+        closeVideoPlayer();
+        return true;
+      case 'INFO':
+        toggleVideoPlayerHudByInfo();
+        return true;
+      case 'OPTION':
+        return true;
+      default:
+        return false;
+    }
+  }
+
+  function handleVideoPlayerOK() {
+    switch (videoPlayerControlIndex) {
+      case 0: // Play/Pause
+        videoPlayerFastMode = null;
+        videoPlayerFastSpeed = 0;
+        isPaused = !isPaused;
+        break;
+      case 1: // Rewind
+        if (videoPlayerFastMode !== 'rewind') {
+          videoPlayerFastMode = 'rewind';
+          videoPlayerFastSpeed = 0;
+          isPaused = true;
+        } else {
+          videoPlayerFastSpeed = (videoPlayerFastSpeed + 1) % 5;
+        }
+        break;
+      case 2: // Forward
+        if (videoPlayerFastMode !== 'forward') {
+          videoPlayerFastMode = 'forward';
+          videoPlayerFastSpeed = 0;
+          isPaused = true;
+        } else {
+          videoPlayerFastSpeed = (videoPlayerFastSpeed + 1) % 5;
+        }
+        break;
+      case 3: // Previous
+        videoPlayerFastMode = null;
+        videoPlayerFastSpeed = 0;
+        if (playableFiles.length > 0) {
+          var prevIndex = (currentPlayingIndex - 1 + playableFiles.length) % playableFiles.length;
+          playVideoAtIndex(prevIndex);
+        }
+        return;
+      case 4: // Next
+        videoPlayerFastMode = null;
+        videoPlayerFastSpeed = 0;
+        if (playableFiles.length > 0) {
+          var nextIndex = (currentPlayingIndex + 1) % playableFiles.length;
+          playVideoAtIndex(nextIndex);
+        }
+        return;
+      case 5: // Shuffle
+        videoPlayerShuffleOn = !videoPlayerShuffleOn;
+        videoShuffleOn = videoPlayerShuffleOn; // Sync to Options
+        videoPlayerPlayedIndices = [];
+        break;
+      case 6: // Repeat
+        videoPlayerRepeatOn = !videoPlayerRepeatOn;
+        videoRepeatMode = videoPlayerRepeatOn ? 'repeat' : 'play-once'; // Sync to Options
+        break;
+    }
+    renderVideoPlayer();
   }
 
   // Photo Player Info
@@ -3507,6 +3945,8 @@
             openMusicPlayer(entry, false);
           } else if (isPhotoFile(entry.name)) {
             openPhotoPlayer(entry, false);
+          } else if (isVideoFile(entry.name)) {
+            openVideoPlayer(entry, false);
           } else {
             playFile(entry);
           }
@@ -4010,6 +4450,11 @@
       return false;
     }
 
+    // Handle video-player view
+    if (currentView === 'video-player') {
+      return handleVideoPlayerNav(act);
+    }
+
     // Handle split/devices views
     switch (act) {
       case 'UP':
@@ -4036,6 +4481,8 @@
               openMusicPlayer(entry, false);
             } else if (isPhotoFile(entry.name)) {
               openPhotoPlayer(entry, false);
+            } else if (isVideoFile(entry.name)) {
+              openVideoPlayer(entry, false);
             } else {
               playFile(entry);
             }
@@ -4462,6 +4909,30 @@
         '.video-info-dlg-close{display:block;width:100%;background:#3182ce;color:#fff;border:none;' +
           'border-radius:28px;padding:16px 32px;font-size:1.3rem;font-weight:600;cursor:pointer;transition:background .15s}' +
         '.video-info-dlg-close:hover{background:#2b6cb0}' +
+        // Video Player styles
+        '.video-player-view{position:absolute;inset:0;display:none;flex-direction:column;background:#0d0f14}' +
+        '.vp-bg{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;' +
+          'background:linear-gradient(135deg,#1a1a2e 0%,#16213e 50%,#0f3460 100%)}' +
+        '.vp-timer{font-size:14rem;font-weight:200;color:rgba(255,255,255,.12);' +
+          'font-family:"Segoe UI Light","Segoe UI",sans-serif;letter-spacing:12px;user-select:none}' +
+        '.vp-pause-icon{position:absolute;font-size:8rem;color:rgba(255,255,255,.3)}' +
+        '.vp-hud{position:absolute;bottom:60px;left:80px;right:80px;' +
+          'background:rgba(74,85,104,0.95);border-radius:16px;display:flex;flex-direction:column;' +
+          'padding:24px 32px;gap:16px;box-shadow:0 8px 40px rgba(0,0,0,.6)}' +
+        '.vp-hud-top{display:flex;flex-direction:row;justify-content:space-between;align-items:center}' +
+        '.vp-filename{color:#fff;font-size:1.8rem;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1}' +
+        '.vp-counter{color:#a0aec0;font-size:1.4rem;margin-left:24px}' +
+        '.vp-progress{display:flex;flex-direction:row;align-items:center;gap:16px}' +
+        '.vp-time{color:#a0aec0;font-size:1.2rem;min-width:50px;text-align:center}' +
+        '.vp-progress-bar{flex:1;height:8px;background:#2d3748;border-radius:4px;overflow:hidden}' +
+        '.vp-progress-fill{height:100%;background:linear-gradient(90deg,#3182ce,#ffc239);border-radius:4px;transition:width .3s ease-out}' +
+        '.vp-controls{display:flex;flex-direction:row;align-items:center;justify-content:center;gap:24px;margin-top:8px}' +
+        '.vp-ctrl-btn{width:80px;height:80px;display:flex;align-items:center;justify-content:center;' +
+          'border-radius:10px;cursor:pointer;transition:all .15s;border:3px solid transparent}' +
+        '.vp-ctrl-btn:hover{background:rgba(255,255,255,.1)}' +
+        '.vp-ctrl-btn.vp-ctrl-selected{background:#3182ce;border-color:#fff}' +
+        '.vp-ctrl-btn.vp-ctrl-off svg{opacity:.5}' +
+        '.vp-fast-speed{color:#fff;font-size:1.8rem;font-weight:700}' +
         '</style>' +
         '<div class="usb-root">' +
           '<div class="usb-player">' +
@@ -4497,6 +4968,7 @@
             '<div class="video-submenu video-viewmode-submenu"></div>' +
             '<div class="video-submenu video-repeat-submenu"></div>' +
             '<div class="video-info-dialog"></div>' +
+            '<div class="video-player-view"></div>' +
           '</div>' +
         '</div>';
       stageEl = el.querySelector('.usb-stage');
@@ -4527,6 +4999,7 @@
       videoViewmodeSubmenuEl = el.querySelector('.video-viewmode-submenu');
       videoRepeatSubmenuEl = el.querySelector('.video-repeat-submenu');
       videoInfoDialogEl = el.querySelector('.video-info-dialog');
+      videoPlayerEl = el.querySelector('.video-player-view');
     },
 
     onShow: function (params) {
@@ -4641,6 +5114,8 @@
                 openMusicPlayer(entry, false);
               } else if (isPhotoFile(entry.name)) {
                 openPhotoPlayer(entry, false);
+              } else if (isVideoFile(entry.name)) {
+                openVideoPlayer(entry, false);
               } else {
                 playFile(entry);
               }
