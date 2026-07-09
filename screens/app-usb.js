@@ -408,9 +408,13 @@
     music: {
       root: [
         { name: 'Albums', isDirectory: true },
+        { name: 'Artists', isDirectory: true },
         { name: 'Playlists', isDirectory: true },
         { name: 'Podcasts', isDirectory: true },
         { name: 'Audiobooks', isDirectory: true },
+        { name: 'Recordings', isDirectory: true },
+        { name: 'Downloads', isDirectory: true },
+        { name: 'Favorites', isDirectory: true },
         { name: 'song_pop_01.mp3', isDirectory: false },
         { name: 'song_pop_02.mp3', isDirectory: false },
         { name: 'song_rock_01.mp3', isDirectory: false },
@@ -434,42 +438,137 @@
         { name: 'Rock Classics', isDirectory: true },
         { name: 'Jazz Collection', isDirectory: true },
         { name: 'Pop Hits 2024', isDirectory: true },
-        { name: 'Electronic Mix', isDirectory: true }
+        { name: 'Electronic Mix', isDirectory: true },
+        { name: 'Classical Masterpieces', isDirectory: true },
+        { name: 'Country Roads', isDirectory: true }
+      ],
+      Artists: [
+        { name: 'The Beatles', isDirectory: true },
+        { name: 'Taylor Swift', isDirectory: true },
+        { name: 'Ed Sheeran', isDirectory: true },
+        { name: 'Adele', isDirectory: true }
       ],
       Playlists: [
         { name: 'favorites.m3u', isDirectory: false },
         { name: 'workout.m3u', isDirectory: false },
         { name: 'relaxing.m3u', isDirectory: false },
-        { name: 'party.m3u', isDirectory: false }
+        { name: 'party.m3u', isDirectory: false },
+        { name: 'road_trip.m3u', isDirectory: false },
+        { name: 'chill_vibes.m3u', isDirectory: false }
       ],
       Podcasts: [
-        { name: 'tech_talk_ep01.mp3', isDirectory: false },
-        { name: 'tech_talk_ep02.mp3', isDirectory: false },
-        { name: 'news_daily.mp3', isDirectory: false }
+        { name: 'Tech Talk', isDirectory: true },
+        { name: 'Daily News', isDirectory: true },
+        { name: 'Science Hour', isDirectory: true },
+        { name: 'podcast_latest.mp3', isDirectory: false }
       ],
       Audiobooks: [
+        { name: 'Fiction', isDirectory: true },
+        { name: 'Non-Fiction', isDirectory: true },
         { name: 'novel_chapter01.mp3', isDirectory: false },
         { name: 'novel_chapter02.mp3', isDirectory: false },
         { name: 'self_help_intro.mp3', isDirectory: false }
       ],
+      Recordings: [
+        { name: 'Voice Memos', isDirectory: true },
+        { name: 'meeting_2024_01.mp3', isDirectory: false },
+        { name: 'meeting_2024_02.mp3', isDirectory: false },
+        { name: 'interview_01.mp3', isDirectory: false },
+        { name: 'lecture_notes.mp3', isDirectory: false }
+      ],
+      Downloads: [
+        { name: 'new_release_01.mp3', isDirectory: false },
+        { name: 'new_release_02.mp3', isDirectory: false },
+        { name: 'trending_hit.mp3', isDirectory: false },
+        { name: 'viral_song.mp3', isDirectory: false }
+      ],
+      Favorites: [
+        { name: 'best_of_2024.mp3', isDirectory: false },
+        { name: 'all_time_favorite.mp3', isDirectory: false },
+        { name: 'loved_track_01.flac', isDirectory: false },
+        { name: 'loved_track_02.flac', isDirectory: false }
+      ],
       'Rock Classics': [
         { name: 'track01_legendary.mp3', isDirectory: false },
         { name: 'track02_anthem.mp3', isDirectory: false },
-        { name: 'track03_ballad.mp3', isDirectory: false }
+        { name: 'track03_ballad.mp3', isDirectory: false },
+        { name: 'guitar_solo.mp3', isDirectory: false },
+        { name: 'rock_anthem.flac', isDirectory: false }
       ],
       'Jazz Collection': [
         { name: 'smooth_jazz_01.flac', isDirectory: false },
-        { name: 'bebop_classic.flac', isDirectory: false }
+        { name: 'bebop_classic.flac', isDirectory: false },
+        { name: 'midnight_sax.mp3', isDirectory: false },
+        { name: 'piano_blues.mp3', isDirectory: false }
       ],
       'Pop Hits 2024': [
         { name: 'summer_hit.mp3', isDirectory: false },
         { name: 'dance_anthem.mp3', isDirectory: false },
-        { name: 'ballad_2024.mp3', isDirectory: false }
+        { name: 'ballad_2024.mp3', isDirectory: false },
+        { name: 'chart_topper.mp3', isDirectory: false }
       ],
       'Electronic Mix': [
         { name: 'techno_01.mp3', isDirectory: false },
         { name: 'house_02.mp3', isDirectory: false },
-        { name: 'trance_03.flac', isDirectory: false }
+        { name: 'trance_03.flac', isDirectory: false },
+        { name: 'dubstep_drop.mp3', isDirectory: false }
+      ],
+      'Classical Masterpieces': [
+        { name: 'symphony_no5.flac', isDirectory: false },
+        { name: 'moonlight_sonata.flac', isDirectory: false },
+        { name: 'four_seasons.mp3', isDirectory: false }
+      ],
+      'Country Roads': [
+        { name: 'country_ballad.mp3', isDirectory: false },
+        { name: 'honky_tonk.mp3', isDirectory: false },
+        { name: 'nashville_nights.mp3', isDirectory: false }
+      ],
+      'The Beatles': [
+        { name: 'hey_jude.mp3', isDirectory: false },
+        { name: 'let_it_be.mp3', isDirectory: false },
+        { name: 'yesterday.mp3', isDirectory: false }
+      ],
+      'Taylor Swift': [
+        { name: 'love_story.mp3', isDirectory: false },
+        { name: 'shake_it_off.mp3', isDirectory: false },
+        { name: 'blank_space.mp3', isDirectory: false }
+      ],
+      'Ed Sheeran': [
+        { name: 'shape_of_you.mp3', isDirectory: false },
+        { name: 'perfect.mp3', isDirectory: false },
+        { name: 'thinking_out_loud.mp3', isDirectory: false }
+      ],
+      'Adele': [
+        { name: 'hello.mp3', isDirectory: false },
+        { name: 'someone_like_you.mp3', isDirectory: false },
+        { name: 'rolling_in_the_deep.mp3', isDirectory: false }
+      ],
+      'Tech Talk': [
+        { name: 'ep01_ai_future.mp3', isDirectory: false },
+        { name: 'ep02_web_dev.mp3', isDirectory: false },
+        { name: 'ep03_cybersecurity.mp3', isDirectory: false }
+      ],
+      'Daily News': [
+        { name: 'news_2024_01_15.mp3', isDirectory: false },
+        { name: 'news_2024_01_16.mp3', isDirectory: false }
+      ],
+      'Science Hour': [
+        { name: 'space_exploration.mp3', isDirectory: false },
+        { name: 'climate_change.mp3', isDirectory: false }
+      ],
+      'Fiction': [
+        { name: 'mystery_novel_ch1.mp3', isDirectory: false },
+        { name: 'mystery_novel_ch2.mp3', isDirectory: false },
+        { name: 'sci_fi_adventure.mp3', isDirectory: false }
+      ],
+      'Non-Fiction': [
+        { name: 'biography_part1.mp3', isDirectory: false },
+        { name: 'history_lesson.mp3', isDirectory: false }
+      ],
+      'Voice Memos': [
+        { name: 'memo_001.mp3', isDirectory: false },
+        { name: 'memo_002.mp3', isDirectory: false },
+        { name: 'reminder.mp3', isDirectory: false }
       ]
     },
     photo: {
@@ -841,12 +940,6 @@
   function renderRightPanel() {
     if (!rightPanelEl) return;
     var cat = CATEGORIES[selectedCategoryIndex];
-
-    // Use music list view for Music category
-    if (cat.id === 'music') {
-      renderMusicListView();
-      return;
-    }
 
     var pathDisplay = currentPath.length > 0 ? currentPath.join(' / ') : cat.name;
     var html = '<div class="usb-right-header">' + escapeHtml(pathDisplay) + '</div>';
@@ -3785,22 +3878,12 @@
         }
       } else {
         if (folderEntries.length === 0) return;
-        // Music category uses list view (single item per move)
-        if (isMusicCategory()) {
-          var newIndex = selectedFolderIndex + dir;
-          if (newIndex >= 0 && newIndex < folderEntries.length) {
-            selectedFolderIndex = newIndex;
-            updateMusicListScrollOffset();
-            renderRightPanel();
-          }
-        } else {
-          // Move by row (GRID_COLS items per row)
-          var newIndex = selectedFolderIndex + (dir * GRID_COLS);
-          if (newIndex >= 0 && newIndex < folderEntries.length) {
-            selectedFolderIndex = newIndex;
-            updateScrollOffset();
-            renderRightPanel();
-          }
+        // Move by row (GRID_COLS items per row) for all categories
+        var newIndex = selectedFolderIndex + (dir * GRID_COLS);
+        if (newIndex >= 0 && newIndex < folderEntries.length) {
+          selectedFolderIndex = newIndex;
+          updateScrollOffset();
+          renderRightPanel();
         }
       }
     }
@@ -3808,11 +3891,6 @@
 
   function moveSelectionHorizontalInGrid(dir) {
     if (folderEntries.length === 0) return false;
-
-    // Music category uses list view - no horizontal movement in list
-    if (isMusicCategory()) {
-      return true;
-    }
 
     var newIndex = selectedFolderIndex + dir;
     // Check if we're at the edge of the grid
@@ -3854,25 +3932,6 @@
 
   function moveLeft() {
     if (currentView === 'split' && activePanel === 'right') {
-      // Music category uses list view - LEFT always goes back to left panel or parent folder
-      if (isMusicCategory()) {
-        if (navigationStack.length > 0) {
-          var prev = navigationStack.pop();
-          currentPath.pop();
-          loadMockFolder(prev.folder);
-          selectedFolderIndex = prev.selectedIndex;
-          musicListScrollOffset = prev.scrollOffset || 0;
-          updateMusicListScrollOffset();
-          renderRightPanel();
-          return true;
-        }
-        // Go back to left panel
-        activePanel = 'left';
-        renderLeftPanel();
-        renderRightPanel();
-        return true;
-      }
-
       var currentCol = selectedFolderIndex % GRID_COLS;
       if (currentCol > 0) {
         // Move left within grid
@@ -3907,7 +3966,7 @@
     navigationStack.push({
       folder: currentFolderKey,
       selectedIndex: selectedFolderIndex,
-      scrollOffset: isMusicCategory() ? musicListScrollOffset : scrollRowOffset
+      scrollOffset: scrollRowOffset
     });
     currentPath.push(folderName);
     loadMockFolder(folderName);
