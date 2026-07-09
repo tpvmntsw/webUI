@@ -4722,11 +4722,11 @@
             '<div class="media-slidespeed-submenu"></div>' +
             '<div class="music-player-view"></div>' +
             '<div class="photo-player-view"></div>' +
+            '<div class="video-player-view"></div>' +
             '<div class="photo-slidespeed-menu"></div>' +
             '<div class="player-slidespeed-menu"></div>' +
             '<div class="photo-player-info"></div>' +
             '<div class="video-info-dialog"></div>' +
-            '<div class="video-player-view"></div>' +
           '</div>' +
         '</div>';
       stageEl = el.querySelector('.usb-stage');
