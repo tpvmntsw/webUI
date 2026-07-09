@@ -38,7 +38,7 @@
 
   var usbDevices = [];
   var selectedDeviceIndex = 0;
-  // 'idle' | 'devices' | 'split' | 'playing' | 'option-menu' | 'video-info' | 'music-options' | 'music-repeat-submenu' | 'music-player' | 'photo-options' | 'photo-viewmode-submenu' | 'photo-repeat-submenu' | 'photo-slidespeed-submenu' | 'photo-player' | 'photo-info' | 'photo-slidespeed-menu' | 'photo-player-info' | 'video-options' | 'video-viewmode-submenu' | 'video-repeat-submenu' | 'video-info-dialog' | 'video-player'
+  // 'idle' | 'devices' | 'split' | 'playing' | 'option-menu' | 'video-info' | 'media-options' | 'media-slidespeed-submenu' | 'music-player' | 'photo-player' | 'photo-slidespeed-menu' | 'photo-player-info' | 'video-info-dialog' | 'video-player'
   var currentView = 'idle';
   var musicPlayerEl = null;
   var photoOptionsEl = null;
@@ -69,14 +69,14 @@
   var playableFiles = []; // filtered list of playable files in current folder
   var currentPlayingIndex = -1;
 
-  // Music Options state
-  var musicOptionsEl = null;
-  var musicRepeatSubmenuEl = null;
-  var musicOptionsIndex = 0;
-  var musicShuffleOn = false;
-  var musicRepeatMode = 'play-once'; // 'play-once' | 'repeat'
-  var musicRepeatSubmenuIndex = 0;
-  var musicOptionsFromLeftPanel = false;
+  // Unified Media Options state (shared across Videos/Photos/Music)
+  var mediaOptionsEl = null;
+  var mediaOptionsIndex = 0;
+  var mediaShuffleOn = false;        // Shared shuffle setting, default Off
+  var mediaRepeatOn = true;          // Shared repeat setting, default On
+  var mediaSlideSpeed = 'fast';      // Shared slide speed (affects Photos only): 'fast' | 'medium' | 'slow'
+  var mediaSlidespeedSubmenuEl = null;
+  var mediaSlidespeedSubmenuIndex = 0;
 
   // Music Player state
   var musicPlayerControlIndex = 0; // 0-7: play/pause, rewind, ff, prev, next, playall, shuffle, repeat
@@ -89,28 +89,7 @@
   var musicPlayerFromPlayAll = false; // true if entered via Play all option
   var musicPlayerPlayedIndices = []; // tracks which songs have been played in Play all mode
 
-  // Photo Options state
-  var photoOptionsIndex = 0;
-  var photoViewMode = 'thumbnails'; // 'thumbnails' | 'list'
-  var photoShuffleOn = false;
-  var photoRepeatMode = 'play-once'; // 'play-once' | 'repeat'
-  var photoSlideSpeed = 'fast'; // 'fast' | 'medium' | 'slow'
-  var photoViewmodeSubmenuIndex = 0;
-  var photoRepeatSubmenuIndex = 0;
-  var photoSlidespeedSubmenuIndex = 0;
-  var photoOptionsFromLeftPanel = false;
-
-  // Video Options state
-  var videoOptionsEl = null;
-  var videoViewmodeSubmenuEl = null;
-  var videoRepeatSubmenuEl = null;
-  var videoOptionsIndex = 0;
-  var videoViewMode = 'thumbnails'; // 'thumbnails' | 'list'
-  var videoShuffleOn = false;
-  var videoRepeatMode = 'play-once'; // 'play-once' | 'repeat'
-  var videoViewmodeSubmenuIndex = 0;
-  var videoRepeatSubmenuIndex = 0;
-  var videoOptionsFromLeftPanel = false;
+  // Video Info Dialog
   var videoInfoDialogEl = null;
 
   // Video Player state
@@ -644,7 +623,7 @@
   };
 
   function render() {
-    if (!idleEl || !deviceListEl || !splitViewEl || !playerViewEl || !optionMenuEl || !videoInfoEl || !fullscreenEl || !windowEl || !musicOptionsEl || !musicRepeatSubmenuEl || !musicPlayerEl || !photoOptionsEl || !photoViewmodeSubmenuEl || !photoRepeatSubmenuEl || !photoSlidespeedSubmenuEl || !photoPlayerEl || !photoInfoEl || !photoSlidespeedMenuEl || !photoPlayerInfoEl || !videoOptionsEl || !videoViewmodeSubmenuEl || !videoRepeatSubmenuEl || !videoInfoDialogEl || !videoPlayerEl) return;
+    if (!idleEl || !deviceListEl || !splitViewEl || !playerViewEl || !optionMenuEl || !videoInfoEl || !fullscreenEl || !windowEl || !mediaOptionsEl || !mediaSlidespeedSubmenuEl || !musicPlayerEl || !photoPlayerEl || !photoSlidespeedMenuEl || !photoPlayerInfoEl || !videoInfoDialogEl || !videoPlayerEl) return;
 
     // Hide all views
     idleEl.style.display = 'none';
@@ -653,35 +632,24 @@
     playerViewEl.style.display = 'none';
     optionMenuEl.style.display = 'none';
     videoInfoEl.style.display = 'none';
-    musicOptionsEl.style.display = 'none';
-    musicRepeatSubmenuEl.style.display = 'none';
+    mediaOptionsEl.style.display = 'none';
+    mediaSlidespeedSubmenuEl.style.display = 'none';
     musicPlayerEl.style.display = 'none';
-    photoOptionsEl.style.display = 'none';
-    photoViewmodeSubmenuEl.style.display = 'none';
-    photoRepeatSubmenuEl.style.display = 'none';
-    photoSlidespeedSubmenuEl.style.display = 'none';
     photoPlayerEl.style.display = 'none';
-    photoInfoEl.style.display = 'none';
     photoSlidespeedMenuEl.style.display = 'none';
     photoPlayerInfoEl.style.display = 'none';
-    videoOptionsEl.style.display = 'none';
-    videoViewmodeSubmenuEl.style.display = 'none';
-    videoRepeatSubmenuEl.style.display = 'none';
     videoInfoDialogEl.style.display = 'none';
     videoPlayerEl.style.display = 'none';
 
-    // Determine if we're in fullscreen mode (split/playing/option-menu/video-info/music-options/music-repeat-submenu/music-player/photo-*/video-*)
+    // Determine if we're in fullscreen mode
     var isFullscreenView = (currentView === 'split' || currentView === 'playing' ||
                             currentView === 'option-menu' || currentView === 'video-info' ||
-                            currentView === 'music-options' || currentView === 'music-repeat-submenu' ||
+                            currentView === 'media-options' || currentView === 'media-slidespeed-submenu' ||
                             currentView === 'music-player' ||
-                            currentView === 'photo-options' || currentView === 'photo-viewmode-submenu' ||
-                            currentView === 'photo-repeat-submenu' || currentView === 'photo-slidespeed-submenu' ||
-                            currentView === 'photo-player' || currentView === 'photo-info' ||
+                            currentView === 'photo-player' ||
                             currentView === 'photo-slidespeed-menu' ||
                             currentView === 'photo-player-info' ||
-                            currentView === 'video-options' || currentView === 'video-viewmode-submenu' ||
-                            currentView === 'video-repeat-submenu' || currentView === 'video-info-dialog' ||
+                            currentView === 'video-info-dialog' ||
                             currentView === 'video-player');
 
     // Toggle between windowed (idle/devices) and fullscreen (split/playing) containers
@@ -725,54 +693,24 @@
       renderLeftPanel();
       renderRightPanel();
       renderVideoInfo();
-    } else if (currentView === 'music-options') {
+    } else if (currentView === 'media-options') {
       splitViewEl.style.display = 'flex';
-      musicOptionsEl.style.display = 'flex';
+      mediaOptionsEl.style.display = 'flex';
       renderLeftPanel();
       renderRightPanel();
-      renderMusicOptions();
-    } else if (currentView === 'music-repeat-submenu') {
+      renderMediaOptions();
+    } else if (currentView === 'media-slidespeed-submenu') {
       splitViewEl.style.display = 'flex';
-      musicRepeatSubmenuEl.style.display = 'flex';
+      mediaSlidespeedSubmenuEl.style.display = 'flex';
       renderLeftPanel();
       renderRightPanel();
-      renderMusicRepeatSubmenu();
+      renderMediaSlidespeedSubmenu();
     } else if (currentView === 'music-player') {
       musicPlayerEl.style.display = 'flex';
       renderMusicPlayer();
-    } else if (currentView === 'photo-options') {
-      splitViewEl.style.display = 'flex';
-      photoOptionsEl.style.display = 'flex';
-      renderLeftPanel();
-      renderRightPanel();
-      renderPhotoOptions();
-    } else if (currentView === 'photo-viewmode-submenu') {
-      splitViewEl.style.display = 'flex';
-      photoViewmodeSubmenuEl.style.display = 'flex';
-      renderLeftPanel();
-      renderRightPanel();
-      renderPhotoViewmodeSubmenu();
-    } else if (currentView === 'photo-repeat-submenu') {
-      splitViewEl.style.display = 'flex';
-      photoRepeatSubmenuEl.style.display = 'flex';
-      renderLeftPanel();
-      renderRightPanel();
-      renderPhotoRepeatSubmenu();
-    } else if (currentView === 'photo-slidespeed-submenu') {
-      splitViewEl.style.display = 'flex';
-      photoSlidespeedSubmenuEl.style.display = 'flex';
-      renderLeftPanel();
-      renderRightPanel();
-      renderPhotoSlidespeedSubmenu();
     } else if (currentView === 'photo-player') {
       photoPlayerEl.style.display = 'flex';
       renderPhotoPlayer();
-    } else if (currentView === 'photo-info') {
-      splitViewEl.style.display = 'flex';
-      photoInfoEl.style.display = 'flex';
-      renderLeftPanel();
-      renderRightPanel();
-      renderPhotoInfo();
     } else if (currentView === 'photo-slidespeed-menu') {
       photoPlayerEl.style.display = 'flex';
       photoSlidespeedMenuEl.style.display = 'flex';
@@ -783,24 +721,6 @@
       photoPlayerInfoEl.style.display = 'flex';
       renderPhotoPlayer();
       renderPhotoPlayerInfo();
-    } else if (currentView === 'video-options') {
-      splitViewEl.style.display = 'flex';
-      videoOptionsEl.style.display = 'flex';
-      renderLeftPanel();
-      renderRightPanel();
-      renderVideoOptions();
-    } else if (currentView === 'video-viewmode-submenu') {
-      splitViewEl.style.display = 'flex';
-      videoViewmodeSubmenuEl.style.display = 'flex';
-      renderLeftPanel();
-      renderRightPanel();
-      renderVideoViewmodeSubmenu();
-    } else if (currentView === 'video-repeat-submenu') {
-      splitViewEl.style.display = 'flex';
-      videoRepeatSubmenuEl.style.display = 'flex';
-      renderLeftPanel();
-      renderRightPanel();
-      renderVideoRepeatSubmenu();
     } else if (currentView === 'video-info-dialog') {
       splitViewEl.style.display = 'flex';
       videoInfoDialogEl.style.display = 'flex';
@@ -1260,104 +1180,147 @@
     videoInfoEl.innerHTML = html;
   }
 
-  function renderMusicOptions() {
-    if (!musicOptionsEl) return;
+  // Unified Media Options (Videos/Photos/Music)
+  // Menu items: Play all (default On), Shuffle (toggle), Repeat (toggle), Slide show speed (submenu)
+  function renderMediaOptions() {
+    if (!mediaOptionsEl) return;
 
-    var shuffleToggle = musicShuffleOn ?
-      '<span class="music-opt-toggle music-opt-toggle-on"></span>' :
-      '<span class="music-opt-toggle music-opt-toggle-off"></span>';
+    var shuffleToggle = mediaShuffleOn ?
+      '<span class="media-opt-toggle media-opt-toggle-on"></span>' :
+      '<span class="media-opt-toggle media-opt-toggle-off"></span>';
 
-    var html = '<div class="music-opt-dialog">' +
-      '<div class="music-opt-header">' +
-        '<span class="music-opt-title">Options</span>' +
+    var repeatToggle = mediaRepeatOn ?
+      '<span class="media-opt-toggle media-opt-toggle-on"></span>' :
+      '<span class="media-opt-toggle media-opt-toggle-off"></span>';
+
+    var speedLabel = mediaSlideSpeed.charAt(0).toUpperCase() + mediaSlideSpeed.slice(1);
+
+    var html = '<div class="media-opt-dialog">' +
+      '<div class="media-opt-header">' +
+        '<span class="media-opt-title">Options</span>' +
       '</div>' +
-      '<div class="music-opt-list">';
+      '<div class="media-opt-list">';
 
-    if (!musicOptionsFromLeftPanel) {
-      var playAllCls = 'music-opt-item' + (musicOptionsIndex === 0 ? ' music-opt-item-selected' : '');
-      html += '<div class="' + playAllCls + '" data-index="0">' +
-        '<span class="music-opt-name">Play all</span>' +
-      '</div>';
-    }
+    // Play all (index 0)
+    var playAllCls = 'media-opt-item' + (mediaOptionsIndex === 0 ? ' media-opt-item-selected' : '');
+    html += '<div class="' + playAllCls + '" data-index="0">' +
+      '<span class="media-opt-name">Play all</span>' +
+    '</div>';
 
-    var shuffleIdx = musicOptionsFromLeftPanel ? 0 : 1;
-    var repeatIdx = musicOptionsFromLeftPanel ? 1 : 2;
-
-    var shuffleCls = 'music-opt-item' + (musicOptionsIndex === shuffleIdx ? ' music-opt-item-selected' : '');
-    html += '<div class="' + shuffleCls + '" data-index="' + shuffleIdx + '">' +
-      '<span class="music-opt-name">Shuffle</span>' +
+    // Shuffle (index 1)
+    var shuffleCls = 'media-opt-item' + (mediaOptionsIndex === 1 ? ' media-opt-item-selected' : '');
+    html += '<div class="' + shuffleCls + '" data-index="1">' +
+      '<span class="media-opt-name">Shuffle</span>' +
       shuffleToggle +
     '</div>';
 
-    var repeatCls = 'music-opt-item' + (musicOptionsIndex === repeatIdx ? ' music-opt-item-selected' : '');
-    html += '<div class="' + repeatCls + '" data-index="' + repeatIdx + '">' +
-      '<span class="music-opt-name">Repeat</span>' +
-      '<span class="music-opt-arrow">&#10095;</span>' +
+    // Repeat (index 2)
+    var repeatCls = 'media-opt-item' + (mediaOptionsIndex === 2 ? ' media-opt-item-selected' : '');
+    html += '<div class="' + repeatCls + '" data-index="2">' +
+      '<span class="media-opt-name">Repeat</span>' +
+      repeatToggle +
+    '</div>';
+
+    // Slide show speed (index 3)
+    var speedCls = 'media-opt-item' + (mediaOptionsIndex === 3 ? ' media-opt-item-selected' : '');
+    html += '<div class="' + speedCls + '" data-index="3">' +
+      '<span class="media-opt-name">Slide show speed</span>' +
+      '<span class="media-opt-value">' + speedLabel + '</span>' +
+      '<span class="media-opt-arrow">&#10095;</span>' +
     '</div>';
 
     html += '</div></div>';
 
-    musicOptionsEl.innerHTML = html;
+    mediaOptionsEl.innerHTML = html;
   }
 
-  function renderMusicRepeatSubmenu() {
-    if (!musicRepeatSubmenuEl) return;
+  function renderMediaSlidespeedSubmenu() {
+    if (!mediaSlidespeedSubmenuEl) return;
 
-    var playOnceCls = 'music-repeat-item' + (musicRepeatSubmenuIndex === 0 ? ' music-repeat-item-selected' : '');
-    var repeatCls = 'music-repeat-item' + (musicRepeatSubmenuIndex === 1 ? ' music-repeat-item-selected' : '');
+    var fastCls = 'media-speed-item' + (mediaSlidespeedSubmenuIndex === 0 ? ' media-speed-item-selected' : '');
+    var mediumCls = 'media-speed-item' + (mediaSlidespeedSubmenuIndex === 1 ? ' media-speed-item-selected' : '');
+    var slowCls = 'media-speed-item' + (mediaSlidespeedSubmenuIndex === 2 ? ' media-speed-item-selected' : '');
 
-    var playOnceCheck = (musicRepeatMode === 'play-once') ? '<span class="music-repeat-check">&#10003;</span>' : '';
-    var repeatCheck = (musicRepeatMode === 'repeat') ? '<span class="music-repeat-check">&#10003;</span>' : '';
+    var fastCheck = (mediaSlideSpeed === 'fast') ? '<span class="media-speed-check">&#10003;</span>' : '';
+    var mediumCheck = (mediaSlideSpeed === 'medium') ? '<span class="media-speed-check">&#10003;</span>' : '';
+    var slowCheck = (mediaSlideSpeed === 'slow') ? '<span class="media-speed-check">&#10003;</span>' : '';
 
-    var html = '<div class="music-repeat-dialog">' +
-      '<div class="music-repeat-header">' +
-        '<span class="music-repeat-title">Repeat</span>' +
+    var html = '<div class="media-speed-dialog">' +
+      '<div class="media-speed-header">' +
+        '<span class="media-speed-title">Slide show speed</span>' +
       '</div>' +
-      '<div class="music-repeat-list">' +
-        '<div class="' + playOnceCls + '" data-index="0">' +
-          '<span class="music-repeat-name">Play once</span>' +
-          playOnceCheck +
+      '<div class="media-speed-list">' +
+        '<div class="' + fastCls + '" data-index="0">' +
+          '<span class="media-speed-name">Fast</span>' +
+          fastCheck +
         '</div>' +
-        '<div class="' + repeatCls + '" data-index="1">' +
-          '<span class="music-repeat-name">Repeat</span>' +
-          repeatCheck +
+        '<div class="' + mediumCls + '" data-index="1">' +
+          '<span class="media-speed-name">Medium</span>' +
+          mediumCheck +
+        '</div>' +
+        '<div class="' + slowCls + '" data-index="2">' +
+          '<span class="media-speed-name">Slow</span>' +
+          slowCheck +
         '</div>' +
       '</div>' +
     '</div>';
 
-    musicRepeatSubmenuEl.innerHTML = html;
+    mediaSlidespeedSubmenuEl.innerHTML = html;
   }
 
-  function openMusicOptions(fromLeftPanel) {
-    var cat = CATEGORIES[selectedCategoryIndex];
-    if (cat.id !== 'music') return false;
-
-    musicOptionsFromLeftPanel = fromLeftPanel;
-    musicOptionsIndex = 0;
-    currentView = 'music-options';
+  function openMediaOptions() {
+    mediaOptionsIndex = 0;
+    currentView = 'media-options';
     render();
     return true;
   }
 
-  function closeMusicOptions() {
+  function closeMediaOptions() {
     currentView = 'split';
     render();
   }
 
-  function openMusicRepeatSubmenu() {
-    musicRepeatSubmenuIndex = (musicRepeatMode === 'play-once') ? 0 : 1;
-    currentView = 'music-repeat-submenu';
+  function openMediaSlidespeedSubmenu() {
+    mediaSlidespeedSubmenuIndex = (mediaSlideSpeed === 'fast') ? 0 : (mediaSlideSpeed === 'medium') ? 1 : 2;
+    currentView = 'media-slidespeed-submenu';
     render();
   }
 
-  function closeMusicRepeatSubmenu() {
-    currentView = 'music-options';
+  function closeMediaSlidespeedSubmenu() {
+    currentView = 'media-options';
     render();
   }
 
-  function confirmMusicRepeat() {
-    musicRepeatMode = (musicRepeatSubmenuIndex === 0) ? 'play-once' : 'repeat';
-    renderMusicRepeatSubmenu();
+  function confirmMediaSlidespeed() {
+    mediaSlideSpeed = (mediaSlidespeedSubmenuIndex === 0) ? 'fast' : (mediaSlidespeedSubmenuIndex === 1) ? 'medium' : 'slow';
+    renderMediaSlidespeedSubmenu();
+  }
+
+  function handleMediaOptionsOK() {
+    var cat = CATEGORIES[selectedCategoryIndex];
+    switch (mediaOptionsIndex) {
+      case 0: // Play all
+        closeMediaOptions();
+        if (cat.id === 'video') {
+          playAllVideosFromOptions();
+        } else if (cat.id === 'photo') {
+          playAllPhotosFromOptions();
+        } else if (cat.id === 'music') {
+          playAllMusicFromOptions();
+        }
+        break;
+      case 1: // Shuffle toggle
+        mediaShuffleOn = !mediaShuffleOn;
+        renderMediaOptions();
+        break;
+      case 2: // Repeat toggle
+        mediaRepeatOn = !mediaRepeatOn;
+        renderMediaOptions();
+        break;
+      case 3: // Slide show speed
+        openMediaSlidespeedSubmenu();
+        break;
+    }
   }
 
   // Music Player SVG icons - clean, universally recognizable (80x80 size)
@@ -1635,14 +1598,14 @@
     musicPlayerFastSpeed = 0;
     musicPlayerPlayedIndices = []; // Reset played tracking
 
-    // Sync options state with Music Options
+    // Sync options state with unified Media Options
     if (fromPlayAll) {
       musicPlayerPlayAllOn = true;
     } else {
       musicPlayerPlayAllOn = false;
     }
-    musicPlayerShuffleOn = musicShuffleOn;
-    musicPlayerRepeatOn = (musicRepeatMode === 'repeat');
+    musicPlayerShuffleOn = mediaShuffleOn;
+    musicPlayerRepeatOn = mediaRepeatOn;
 
     buildPlayableList();
     currentPlayingIndex = -1;
@@ -1691,9 +1654,33 @@
     isPaused = false;
     musicPlayerPlayAllOn = false; // Reset Play All state on exit
 
-    updateMusicListScrollOffset();
+    updateScrollOffset();
     currentView = 'split';
     render();
+  }
+
+  function playAllMusicFromOptions() {
+    buildPlayableMusicList();
+    if (playableFiles.length === 0) return;
+
+    var startEntry;
+    if (mediaShuffleOn) {
+      var startIndex = Math.floor(Math.random() * playableFiles.length);
+      startEntry = playableFiles[startIndex];
+    } else {
+      startEntry = playableFiles[0];
+    }
+    openMusicPlayer(startEntry, true);
+  }
+
+  function buildPlayableMusicList() {
+    playableFiles = [];
+    for (var i = 0; i < folderEntries.length; i++) {
+      var entry = folderEntries[i];
+      if (!entry.isDirectory && isMusicFile(entry.name)) {
+        playableFiles.push(entry);
+      }
+    }
   }
 
   function startMusicPlayerTimer() {
@@ -2183,7 +2170,7 @@
     if (playableFiles.length === 0) return;
 
     var startEntry;
-    if (photoShuffleOn) {
+    if (mediaShuffleOn) {
       var startIndex = Math.floor(Math.random() * playableFiles.length);
       startEntry = playableFiles[startIndex];
     } else {
@@ -2208,15 +2195,15 @@
     photoPlayerControlIndex = 0;
     photoPlayerPlayedIndices = [];
 
-    // Sync options state
+    // Sync options state with unified Media Options
     if (fromSlideshow) {
       photoPlayerPlayAllOn = true;
     } else {
       photoPlayerPlayAllOn = false;
     }
-    photoPlayerShuffleOn = photoShuffleOn;
-    photoPlayerRepeatOn = (photoRepeatMode === 'repeat');
-    photoPlayerSlideSpeed = photoSlideSpeed;
+    photoPlayerShuffleOn = mediaShuffleOn;
+    photoPlayerRepeatOn = mediaRepeatOn;
+    photoPlayerSlideSpeed = mediaSlideSpeed;
 
     buildPlayablePhotoList();
     currentPlayingIndex = -1;
@@ -2921,7 +2908,7 @@
     if (playableFiles.length === 0) return;
 
     var startEntry;
-    if (videoShuffleOn) {
+    if (mediaShuffleOn) {
       var startIndex = Math.floor(Math.random() * playableFiles.length);
       startEntry = playableFiles[startIndex];
     } else {
@@ -2988,14 +2975,14 @@
     videoPlayerFastMode = null;
     videoPlayerFastSpeed = 0;
 
-    // Sync options state
+    // Sync options state with unified Media Options
     if (fromPlayAll) {
       videoPlayerPlayAllOn = true;
     } else {
       videoPlayerPlayAllOn = false;
     }
-    videoPlayerShuffleOn = videoShuffleOn;
-    videoPlayerRepeatOn = (videoRepeatMode === 'repeat');
+    videoPlayerShuffleOn = mediaShuffleOn;
+    videoPlayerRepeatOn = mediaRepeatOn;
 
     buildPlayableVideoList();
     currentPlayingIndex = -1;
@@ -4189,60 +4176,58 @@
       return false;
     }
 
-    // Handle music-options view
-    if (currentView === 'music-options') {
-      var maxIdx = musicOptionsFromLeftPanel ? 1 : 2;
-      var repeatIdx = musicOptionsFromLeftPanel ? 1 : 2;
+    // Handle unified media-options view
+    if (currentView === 'media-options') {
       switch (act) {
         case 'UP':
-          if (musicOptionsIndex > 0) {
-            musicOptionsIndex--;
-            renderMusicOptions();
+          if (mediaOptionsIndex > 0) {
+            mediaOptionsIndex--;
+            renderMediaOptions();
           }
           return true;
         case 'DOWN':
-          if (musicOptionsIndex < maxIdx) {
-            musicOptionsIndex++;
-            renderMusicOptions();
+          if (mediaOptionsIndex < 3) {
+            mediaOptionsIndex++;
+            renderMediaOptions();
           }
           return true;
         case 'OK':
-          handleMusicOptionsOK();
+          handleMediaOptionsOK();
           return true;
         case 'RIGHT':
-          if (musicOptionsIndex === repeatIdx) {
-            openMusicRepeatSubmenu();
+          if (mediaOptionsIndex === 3) {
+            openMediaSlidespeedSubmenu();
           }
           return true;
         case 'BACK':
         case 'OPTION':
-          closeMusicOptions();
+          closeMediaOptions();
           return true;
       }
       return false;
     }
 
-    // Handle music-repeat-submenu view
-    if (currentView === 'music-repeat-submenu') {
+    // Handle media-slidespeed-submenu view
+    if (currentView === 'media-slidespeed-submenu') {
       switch (act) {
         case 'UP':
-          if (musicRepeatSubmenuIndex > 0) {
-            musicRepeatSubmenuIndex--;
-            renderMusicRepeatSubmenu();
+          if (mediaSlidespeedSubmenuIndex > 0) {
+            mediaSlidespeedSubmenuIndex--;
+            renderMediaSlidespeedSubmenu();
           }
           return true;
         case 'DOWN':
-          if (musicRepeatSubmenuIndex < 1) {
-            musicRepeatSubmenuIndex++;
-            renderMusicRepeatSubmenu();
+          if (mediaSlidespeedSubmenuIndex < 2) {
+            mediaSlidespeedSubmenuIndex++;
+            renderMediaSlidespeedSubmenu();
           }
           return true;
         case 'OK':
-          confirmMusicRepeat();
+          confirmMediaSlidespeed();
           return true;
         case 'LEFT':
         case 'BACK':
-          closeMusicRepeatSubmenu();
+          closeMediaSlidespeedSubmenu();
           return true;
       }
       return false;
@@ -4251,126 +4236,6 @@
     // Handle music-player view
     if (currentView === 'music-player') {
       return handleMusicPlayerNav(act);
-    }
-
-    // Handle photo-options view
-    if (currentView === 'photo-options') {
-      var maxIdx = getPhotoOptionsMaxIndex();
-      switch (act) {
-        case 'UP':
-          if (photoOptionsIndex > 0) {
-            photoOptionsIndex--;
-            renderPhotoOptions();
-          }
-          return true;
-        case 'DOWN':
-          if (photoOptionsIndex < maxIdx) {
-            photoOptionsIndex++;
-            renderPhotoOptions();
-          }
-          return true;
-        case 'OK':
-          handlePhotoOptionsOK();
-          return true;
-        case 'RIGHT':
-          handlePhotoOptionsRight();
-          return true;
-        case 'BACK':
-        case 'OPTION':
-          closePhotoOptions();
-          return true;
-      }
-      return false;
-    }
-
-    // Handle photo-viewmode-submenu view
-    if (currentView === 'photo-viewmode-submenu') {
-      switch (act) {
-        case 'UP':
-          if (photoViewmodeSubmenuIndex > 0) {
-            photoViewmodeSubmenuIndex--;
-            renderPhotoViewmodeSubmenu();
-          }
-          return true;
-        case 'DOWN':
-          if (photoViewmodeSubmenuIndex < 1) {
-            photoViewmodeSubmenuIndex++;
-            renderPhotoViewmodeSubmenu();
-          }
-          return true;
-        case 'OK':
-          confirmPhotoViewmode();
-          return true;
-        case 'LEFT':
-        case 'BACK':
-          closePhotoViewmodeSubmenu();
-          return true;
-      }
-      return false;
-    }
-
-    // Handle photo-repeat-submenu view
-    if (currentView === 'photo-repeat-submenu') {
-      switch (act) {
-        case 'UP':
-          if (photoRepeatSubmenuIndex > 0) {
-            photoRepeatSubmenuIndex--;
-            renderPhotoRepeatSubmenu();
-          }
-          return true;
-        case 'DOWN':
-          if (photoRepeatSubmenuIndex < 1) {
-            photoRepeatSubmenuIndex++;
-            renderPhotoRepeatSubmenu();
-          }
-          return true;
-        case 'OK':
-          confirmPhotoRepeat();
-          return true;
-        case 'LEFT':
-        case 'BACK':
-          closePhotoRepeatSubmenu();
-          return true;
-      }
-      return false;
-    }
-
-    // Handle photo-slidespeed-submenu view
-    if (currentView === 'photo-slidespeed-submenu') {
-      switch (act) {
-        case 'UP':
-          if (photoSlidespeedSubmenuIndex > 0) {
-            photoSlidespeedSubmenuIndex--;
-            renderPhotoSlidespeedSubmenu();
-          }
-          return true;
-        case 'DOWN':
-          if (photoSlidespeedSubmenuIndex < 2) {
-            photoSlidespeedSubmenuIndex++;
-            renderPhotoSlidespeedSubmenu();
-          }
-          return true;
-        case 'OK':
-          confirmPhotoSlidespeed();
-          return true;
-        case 'LEFT':
-        case 'BACK':
-          closePhotoSlidespeedSubmenu();
-          return true;
-      }
-      return false;
-    }
-
-    // Handle photo-info view
-    if (currentView === 'photo-info') {
-      switch (act) {
-        case 'OK':
-        case 'BACK':
-        case 'INFO':
-          closePhotoInfo();
-          return true;
-      }
-      return false;
     }
 
     // Handle photo-player view
@@ -4410,88 +4275,6 @@
         case 'BACK':
         case 'INFO':
           closePhotoPlayerInfo();
-          return true;
-      }
-      return false;
-    }
-
-    // Handle video-options view
-    if (currentView === 'video-options') {
-      var maxIdx = getVideoOptionsMaxIndex();
-      switch (act) {
-        case 'UP':
-          if (videoOptionsIndex > 0) {
-            videoOptionsIndex--;
-            renderVideoOptions();
-          }
-          return true;
-        case 'DOWN':
-          if (videoOptionsIndex < maxIdx) {
-            videoOptionsIndex++;
-            renderVideoOptions();
-          }
-          return true;
-        case 'OK':
-          handleVideoOptionsOK();
-          return true;
-        case 'RIGHT':
-          handleVideoOptionsRight();
-          return true;
-        case 'BACK':
-        case 'OPTION':
-          closeVideoOptions();
-          return true;
-      }
-      return false;
-    }
-
-    // Handle video-viewmode-submenu view
-    if (currentView === 'video-viewmode-submenu') {
-      switch (act) {
-        case 'UP':
-          if (videoViewmodeSubmenuIndex > 0) {
-            videoViewmodeSubmenuIndex--;
-            renderVideoViewmodeSubmenu();
-          }
-          return true;
-        case 'DOWN':
-          if (videoViewmodeSubmenuIndex < 1) {
-            videoViewmodeSubmenuIndex++;
-            renderVideoViewmodeSubmenu();
-          }
-          return true;
-        case 'OK':
-          confirmVideoViewmode();
-          return true;
-        case 'LEFT':
-        case 'BACK':
-          closeVideoViewmodeSubmenu();
-          return true;
-      }
-      return false;
-    }
-
-    // Handle video-repeat-submenu view
-    if (currentView === 'video-repeat-submenu') {
-      switch (act) {
-        case 'UP':
-          if (videoRepeatSubmenuIndex > 0) {
-            videoRepeatSubmenuIndex--;
-            renderVideoRepeatSubmenu();
-          }
-          return true;
-        case 'DOWN':
-          if (videoRepeatSubmenuIndex < 1) {
-            videoRepeatSubmenuIndex++;
-            renderVideoRepeatSubmenu();
-          }
-          return true;
-        case 'OK':
-          confirmVideoRepeat();
-          return true;
-        case 'LEFT':
-        case 'BACK':
-          closeVideoRepeatSubmenu();
           return true;
       }
       return false;
@@ -4550,42 +4333,8 @@
         }
         return false;
       case 'OPTION':
-        // Option key in Music category opens music options
-        if (isMusicCategory()) {
-          if (activePanel === 'left') {
-            return openMusicOptions(true);
-          } else if (activePanel === 'right' && folderEntries.length > 0) {
-            var entry = folderEntries[selectedFolderIndex];
-            if (!entry.isDirectory && isMusicFile(entry.name)) {
-              return openMusicOptions(false);
-            }
-          }
-        }
-        // Option key in Photo category opens photo options
-        if (isPhotoCategory()) {
-          if (activePanel === 'left') {
-            return openPhotoOptions(true);
-          } else if (activePanel === 'right' && folderEntries.length > 0) {
-            var entry = folderEntries[selectedFolderIndex];
-            // Open photo options for folders or photo files
-            if (entry.isDirectory || isPhotoFile(entry.name)) {
-              return openPhotoOptions(entry.isDirectory);
-            }
-          }
-        }
-        // Option key in Video category opens video options
-        if (isVideoCategory()) {
-          if (activePanel === 'left') {
-            return openVideoOptions(true);
-          } else if (activePanel === 'right' && folderEntries.length > 0) {
-            var entry = folderEntries[selectedFolderIndex];
-            // Open video options for folders or video files
-            if (entry.isDirectory || isVideoFile(entry.name)) {
-              return openVideoOptions(entry.isDirectory);
-            }
-          }
-        }
-        return false;
+        // Unified Media Options for Videos/Photos/Music
+        return openMediaOptions();
       case 'INFO':
         // Show video info if in Videos category and on a video file
         return showVideoInfo();
@@ -4760,45 +4509,47 @@
         '.usb-video-info-close:hover{background:#2b6cb0}' +
         // Fullscreen views (split/playing) - positioned outside usb-player window
         '.usb-fullscreen{position:absolute;inset:0;display:none;background:#0d0f14}' +
-        // Music Options dialog styles (matching Info Menu style)
-        '.music-options{position:absolute;inset:0;display:none;align-items:flex-start;justify-content:flex-start;' +
-          'background:rgba(0,0,0,.5);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);padding-top:80px;padding-left:60px}' +
-        '.music-opt-dialog{background:#4a5568;border:3px solid #718096;border-radius:16px;min-width:420px;' +
+        // Unified Media Options dialog styles (centered like Info Menu)
+        '.media-options{position:absolute;inset:0;display:none;align-items:center;justify-content:center;' +
+          'background:rgba(0,0,0,.7);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}' +
+        '.media-opt-dialog{background:#4a5568;border:3px solid #718096;border-radius:16px;min-width:420px;' +
           'padding:32px 48px;box-shadow:0 12px 60px rgba(0,0,0,.8)}' +
-        '.music-opt-header{margin-bottom:24px}' +
-        '.music-opt-title{font-size:2rem;font-weight:600;color:#ffc239;letter-spacing:.5px}' +
-        '.music-opt-list{display:flex;flex-direction:column;gap:8px}' +
-        '.music-opt-item{display:flex;align-items:center;padding:18px 24px;color:#e2e8f0;' +
+        '.media-opt-header{margin-bottom:24px}' +
+        '.media-opt-title{font-size:2rem;font-weight:600;color:#ffc239;letter-spacing:.5px}' +
+        '.media-opt-list{display:flex;flex-direction:column;gap:8px}' +
+        '.media-opt-item{display:flex;align-items:center;padding:18px 24px;color:#e2e8f0;' +
           'background:#5a6578;border:2px solid #718096;border-radius:12px;cursor:pointer;transition:all .15s}' +
-        '.music-opt-item:hover{background:#6a7588;border-color:#8a94a6}' +
-        '.music-opt-item.music-opt-item-selected{background:#3182ce;color:#fff;border-color:#fff}' +
-        '.music-opt-name{flex:1;font-size:1.4rem;font-weight:500}' +
-        '.music-opt-arrow{font-size:1.2rem;color:#a0aec0}' +
-        '.music-opt-item.music-opt-item-selected .music-opt-arrow{color:#fff}' +
-        // Toggle switch styles (updated for Info Menu style)
-        '.music-opt-toggle{display:inline-block;width:52px;height:28px;border-radius:14px;position:relative;' +
+        '.media-opt-item:hover{background:#6a7588;border-color:#8a94a6}' +
+        '.media-opt-item.media-opt-item-selected{background:#3182ce;color:#fff;border-color:#fff}' +
+        '.media-opt-name{flex:1;font-size:1.4rem;font-weight:500}' +
+        '.media-opt-value{font-size:1.2rem;color:#a0aec0;margin-right:12px}' +
+        '.media-opt-item.media-opt-item-selected .media-opt-value{color:#fff}' +
+        '.media-opt-arrow{font-size:1.2rem;color:#a0aec0}' +
+        '.media-opt-item.media-opt-item-selected .media-opt-arrow{color:#fff}' +
+        // Toggle switch styles for Media Options
+        '.media-opt-toggle{display:inline-block;width:52px;height:28px;border-radius:14px;position:relative;' +
           'transition:background .2s}' +
-        '.music-opt-toggle::after{content:"";position:absolute;top:3px;width:22px;height:22px;' +
+        '.media-opt-toggle::after{content:"";position:absolute;top:3px;width:22px;height:22px;' +
           'border-radius:50%;background:#fff;transition:left .2s}' +
-        '.music-opt-toggle-off{background:#718096}' +
-        '.music-opt-toggle-off::after{left:3px}' +
-        '.music-opt-toggle-on{background:#3a86ff}' +
-        '.music-opt-toggle-on::after{left:27px}' +
-        // Music Repeat submenu dialog styles (matching Info Menu style)
-        '.music-repeat-submenu{position:absolute;inset:0;display:none;align-items:flex-start;justify-content:flex-start;' +
-          'background:rgba(0,0,0,.5);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);padding-top:80px;padding-left:60px}' +
-        '.music-repeat-dialog{background:#4a5568;border:3px solid #718096;border-radius:16px;min-width:420px;' +
+        '.media-opt-toggle-off{background:#718096}' +
+        '.media-opt-toggle-off::after{left:3px}' +
+        '.media-opt-toggle-on{background:#3a86ff}' +
+        '.media-opt-toggle-on::after{left:27px}' +
+        // Media Slide speed submenu dialog styles (centered)
+        '.media-slidespeed-submenu{position:absolute;inset:0;display:none;align-items:center;justify-content:center;' +
+          'background:rgba(0,0,0,.7);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}' +
+        '.media-speed-dialog{background:#4a5568;border:3px solid #718096;border-radius:16px;min-width:420px;' +
           'padding:32px 48px;box-shadow:0 12px 60px rgba(0,0,0,.8)}' +
-        '.music-repeat-header{margin-bottom:24px}' +
-        '.music-repeat-title{font-size:2rem;font-weight:600;color:#ffc239;letter-spacing:.5px}' +
-        '.music-repeat-list{display:flex;flex-direction:column;gap:8px}' +
-        '.music-repeat-item{display:flex;align-items:center;padding:18px 24px;color:#e2e8f0;' +
+        '.media-speed-header{margin-bottom:24px}' +
+        '.media-speed-title{font-size:2rem;font-weight:600;color:#ffc239;letter-spacing:.5px}' +
+        '.media-speed-list{display:flex;flex-direction:column;gap:8px}' +
+        '.media-speed-item{display:flex;align-items:center;padding:18px 24px;color:#e2e8f0;' +
           'background:#5a6578;border:2px solid #718096;border-radius:12px;cursor:pointer;transition:all .15s}' +
-        '.music-repeat-item:hover{background:#6a7588;border-color:#8a94a6}' +
-        '.music-repeat-item.music-repeat-item-selected{background:#3182ce;color:#fff;border-color:#fff}' +
-        '.music-repeat-name{flex:1;font-size:1.4rem;font-weight:500}' +
-        '.music-repeat-check{font-size:1.4rem;color:#e2e8f0}' +
-        '.music-repeat-item.music-repeat-item-selected .music-repeat-check{color:#fff}' +
+        '.media-speed-item:hover{background:#6a7588;border-color:#8a94a6}' +
+        '.media-speed-item.media-speed-item-selected{background:#3182ce;color:#fff;border-color:#fff}' +
+        '.media-speed-name{flex:1;font-size:1.4rem;font-weight:500}' +
+        '.media-speed-check{font-size:1.4rem;color:#e2e8f0}' +
+        '.media-speed-item.media-speed-item-selected .media-speed-check{color:#fff}' +
         // Music Player styles (matching reference mp.jpg)
         '.music-player-view{position:absolute;inset:0;display:none;flex-direction:column;background:#0d0f14}' +
         '.mp-bg{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;' +
@@ -4828,54 +4579,6 @@
         '.mp-ctrl-btn.mp-ctrl-selected{background:#3182ce;border-color:#fff}' +
         '.mp-ctrl-btn.mp-ctrl-off svg{opacity:.5}' +
         '.mp-fast-speed{color:#fff;font-size:2.4rem;font-weight:700}' +
-        // Photo Options dialog styles (matching Music Options style)
-        '.photo-options{position:absolute;inset:0;display:none;align-items:flex-start;justify-content:flex-start;' +
-          'background:rgba(0,0,0,.5);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);padding-top:80px;padding-left:60px}' +
-        '.photo-opt-dialog{background:#4a5568;border:3px solid #718096;border-radius:16px;min-width:420px;' +
-          'padding:32px 48px;box-shadow:0 12px 60px rgba(0,0,0,.8)}' +
-        '.photo-opt-header{margin-bottom:24px}' +
-        '.photo-opt-title{font-size:2rem;font-weight:600;color:#ffc239;letter-spacing:.5px}' +
-        '.photo-opt-list{display:flex;flex-direction:column;gap:8px}' +
-        '.photo-opt-item{display:flex;align-items:center;padding:18px 24px;color:#e2e8f0;' +
-          'background:#5a6578;border:2px solid #718096;border-radius:12px;cursor:pointer;transition:all .15s}' +
-        '.photo-opt-item:hover{background:#6a7588;border-color:#8a94a6}' +
-        '.photo-opt-item.photo-opt-item-selected{background:#3182ce;color:#fff;border-color:#fff}' +
-        '.photo-opt-name{flex:1;font-size:1.4rem;font-weight:500}' +
-        '.photo-opt-arrow{font-size:1.2rem;color:#a0aec0}' +
-        '.photo-opt-item.photo-opt-item-selected .photo-opt-arrow{color:#fff}' +
-        '.photo-opt-toggle{display:inline-block;width:52px;height:28px;border-radius:14px;position:relative;transition:background .2s}' +
-        '.photo-opt-toggle::after{content:"";position:absolute;top:3px;width:22px;height:22px;border-radius:50%;background:#fff;transition:left .2s}' +
-        '.photo-opt-toggle-off{background:#718096}' +
-        '.photo-opt-toggle-off::after{left:3px}' +
-        '.photo-opt-toggle-on{background:#3a86ff}' +
-        '.photo-opt-toggle-on::after{left:27px}' +
-        // Photo submenu dialog styles (for viewmode, repeat, slidespeed)
-        '.photo-submenu{position:absolute;inset:0;display:none;align-items:flex-start;justify-content:flex-start;' +
-          'background:rgba(0,0,0,.5);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);padding-top:80px;padding-left:60px}' +
-        '.photo-submenu-dialog{background:#4a5568;border:3px solid #718096;border-radius:16px;min-width:420px;' +
-          'padding:32px 48px;box-shadow:0 12px 60px rgba(0,0,0,.8)}' +
-        '.photo-submenu-header{margin-bottom:24px}' +
-        '.photo-submenu-title{font-size:2rem;font-weight:600;color:#ffc239;letter-spacing:.5px}' +
-        '.photo-submenu-list{display:flex;flex-direction:column;gap:8px}' +
-        '.photo-submenu-item{display:flex;align-items:center;padding:18px 24px;color:#e2e8f0;' +
-          'background:#5a6578;border:2px solid #718096;border-radius:12px;cursor:pointer;transition:all .15s}' +
-        '.photo-submenu-item:hover{background:#6a7588;border-color:#8a94a6}' +
-        '.photo-submenu-item.photo-submenu-item-selected{background:#3182ce;color:#fff;border-color:#fff}' +
-        '.photo-submenu-name{flex:1;font-size:1.4rem;font-weight:500}' +
-        '.photo-submenu-check{font-size:1.4rem;color:#e2e8f0}' +
-        '.photo-submenu-item.photo-submenu-item-selected .photo-submenu-check{color:#fff}' +
-        // Photo Info dialog styles
-        '.photo-info{position:absolute;inset:0;display:none;align-items:center;justify-content:center;' +
-          'background:rgba(0,0,0,.7);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}' +
-        '.photo-info-dialog{background:#4a5568;border:3px solid #718096;border-radius:16px;' +
-          'padding:32px 48px;min-width:480px;box-shadow:0 12px 60px rgba(0,0,0,.8)}' +
-        '.photo-info-title{color:#ffc239;font-size:2rem;font-weight:600;margin-bottom:28px}' +
-        '.photo-info-content{margin-bottom:32px}' +
-        '.photo-info-row{color:#e2e8f0;font-size:1.4rem;margin:12px 0;line-height:1.6}' +
-        '.photo-info-label{color:#e2e8f0;font-weight:600}' +
-        '.photo-info-close{display:block;width:100%;background:#3182ce;color:#fff;border:none;' +
-          'border-radius:28px;padding:16px 32px;font-size:1.3rem;font-weight:600;cursor:pointer;transition:background .15s}' +
-        '.photo-info-close:hover{background:#2b6cb0}' +
         // Photo Player styles
         '.photo-player-view{position:absolute;inset:0;display:none;flex-direction:column;background:#0d0f14}' +
         '.pp-bg{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background-size:cover;background-position:center}' +
@@ -4920,42 +4623,6 @@
         '.pp-info-close{display:block;width:100%;background:#3182ce;color:#fff;border:none;' +
           'border-radius:28px;padding:16px 32px;font-size:1.3rem;font-weight:600;cursor:pointer;transition:background .15s}' +
         '.pp-info-close:hover{background:#2b6cb0}' +
-        // Video Options dialog styles (matching Photo Options style)
-        '.video-options{position:absolute;inset:0;display:none;align-items:flex-start;justify-content:flex-start;' +
-          'background:rgba(0,0,0,.5);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);padding-top:80px;padding-left:60px}' +
-        '.video-opt-dialog{background:#4a5568;border:3px solid #718096;border-radius:16px;min-width:420px;' +
-          'padding:32px 48px;box-shadow:0 12px 60px rgba(0,0,0,.8)}' +
-        '.video-opt-header{margin-bottom:24px}' +
-        '.video-opt-title{font-size:2rem;font-weight:600;color:#ffc239;letter-spacing:.5px}' +
-        '.video-opt-list{display:flex;flex-direction:column;gap:8px}' +
-        '.video-opt-item{display:flex;align-items:center;padding:18px 24px;color:#e2e8f0;' +
-          'background:#5a6578;border:2px solid #718096;border-radius:12px;cursor:pointer;transition:all .15s}' +
-        '.video-opt-item:hover{background:#6a7588;border-color:#8a94a6}' +
-        '.video-opt-item.video-opt-item-selected{background:#3182ce;color:#fff;border-color:#fff}' +
-        '.video-opt-name{flex:1;font-size:1.4rem;font-weight:500}' +
-        '.video-opt-arrow{font-size:1.2rem;color:#a0aec0}' +
-        '.video-opt-item.video-opt-item-selected .video-opt-arrow{color:#fff}' +
-        '.video-opt-toggle{display:inline-block;width:52px;height:28px;border-radius:14px;position:relative;transition:background .2s}' +
-        '.video-opt-toggle::after{content:"";position:absolute;top:3px;width:22px;height:22px;border-radius:50%;background:#fff;transition:left .2s}' +
-        '.video-opt-toggle-off{background:#718096}' +
-        '.video-opt-toggle-off::after{left:3px}' +
-        '.video-opt-toggle-on{background:#3a86ff}' +
-        '.video-opt-toggle-on::after{left:27px}' +
-        // Video submenu dialog styles (for viewmode, repeat)
-        '.video-submenu{position:absolute;inset:0;display:none;align-items:flex-start;justify-content:flex-start;' +
-          'background:rgba(0,0,0,.5);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);padding-top:80px;padding-left:60px}' +
-        '.video-submenu-dialog{background:#4a5568;border:3px solid #718096;border-radius:16px;min-width:420px;' +
-          'padding:32px 48px;box-shadow:0 12px 60px rgba(0,0,0,.8)}' +
-        '.video-submenu-header{margin-bottom:24px}' +
-        '.video-submenu-title{font-size:2rem;font-weight:600;color:#ffc239;letter-spacing:.5px}' +
-        '.video-submenu-list{display:flex;flex-direction:column;gap:8px}' +
-        '.video-submenu-item{display:flex;align-items:center;padding:18px 24px;color:#e2e8f0;' +
-          'background:#5a6578;border:2px solid #718096;border-radius:12px;cursor:pointer;transition:all .15s}' +
-        '.video-submenu-item:hover{background:#6a7588;border-color:#8a94a6}' +
-        '.video-submenu-item.video-submenu-item-selected{background:#3182ce;color:#fff;border-color:#fff}' +
-        '.video-submenu-name{flex:1;font-size:1.4rem;font-weight:500}' +
-        '.video-submenu-check{font-size:1.4rem;color:#e2e8f0}' +
-        '.video-submenu-item.video-submenu-item-selected .video-submenu-check{color:#fff}' +
         // Video Info dialog styles (from Options menu)
         '.video-info-dialog{position:absolute;inset:0;display:none;align-items:center;justify-content:center;' +
           'background:rgba(0,0,0,.7);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}' +
@@ -5012,20 +4679,12 @@
             '<div class="usb-player-view"></div>' +
             '<div class="usb-option-menu"></div>' +
             '<div class="usb-video-info"></div>' +
-            '<div class="music-options"></div>' +
-            '<div class="music-repeat-submenu"></div>' +
+            '<div class="media-options"></div>' +
+            '<div class="media-slidespeed-submenu"></div>' +
             '<div class="music-player-view"></div>' +
-            '<div class="photo-options"></div>' +
-            '<div class="photo-submenu photo-viewmode-submenu"></div>' +
-            '<div class="photo-submenu photo-repeat-submenu"></div>' +
-            '<div class="photo-submenu photo-slidespeed-submenu"></div>' +
             '<div class="photo-player-view"></div>' +
-            '<div class="photo-info"></div>' +
             '<div class="photo-slidespeed-menu"></div>' +
             '<div class="photo-player-info"></div>' +
-            '<div class="video-options"></div>' +
-            '<div class="video-submenu video-viewmode-submenu"></div>' +
-            '<div class="video-submenu video-repeat-submenu"></div>' +
             '<div class="video-info-dialog"></div>' +
             '<div class="video-player-view"></div>' +
           '</div>' +
@@ -5043,20 +4702,12 @@
       playerViewEl = el.querySelector('.usb-player-view');
       optionMenuEl = el.querySelector('.usb-option-menu');
       videoInfoEl = el.querySelector('.usb-video-info');
-      musicOptionsEl = el.querySelector('.music-options');
-      musicRepeatSubmenuEl = el.querySelector('.music-repeat-submenu');
+      mediaOptionsEl = el.querySelector('.media-options');
+      mediaSlidespeedSubmenuEl = el.querySelector('.media-slidespeed-submenu');
       musicPlayerEl = el.querySelector('.music-player-view');
-      photoOptionsEl = el.querySelector('.photo-options');
-      photoViewmodeSubmenuEl = el.querySelector('.photo-viewmode-submenu');
-      photoRepeatSubmenuEl = el.querySelector('.photo-repeat-submenu');
-      photoSlidespeedSubmenuEl = el.querySelector('.photo-slidespeed-submenu');
       photoPlayerEl = el.querySelector('.photo-player-view');
-      photoInfoEl = el.querySelector('.photo-info');
       photoSlidespeedMenuEl = el.querySelector('.photo-slidespeed-menu');
       photoPlayerInfoEl = el.querySelector('.photo-player-info');
-      videoOptionsEl = el.querySelector('.video-options');
-      videoViewmodeSubmenuEl = el.querySelector('.video-viewmode-submenu');
-      videoRepeatSubmenuEl = el.querySelector('.video-repeat-submenu');
       videoInfoDialogEl = el.querySelector('.video-info-dialog');
       videoPlayerEl = el.querySelector('.video-player-view');
     },
